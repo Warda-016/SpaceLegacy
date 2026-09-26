@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 430" fill="none">
+  <defs>
+    <linearGradient id="crestMetallic" x1="60" y1="20" x2="340" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#b4d2d9" />
+      <stop offset="45%" stop-color="#8bb0b9" />
+      <stop offset="100%" stop-color="#6b9099" />
+    </linearGradient>
+    <filter id="dropGlow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <g
+    filter="url(#dropGlow)"
+    stroke="url(#crestMetallic)"
+    stroke-width="11.5"
+    stroke-linecap="miter"
+    stroke-linejoin="miter"
+    stroke-miterlimit="10"
+  >
+    <!-- Loop 1: Top Center Apex -> Inner Diagonals -> Inner Concave Sides -> Bottom Center Apex -->
+    <path d="
+      M 200 32
+      L 290 122
+      C 266 158, 266 226, 290 262
+      L 200 352
+      L 110 262
+      C 134 226, 134 158, 110 122
+      Z
+    " />
+
+    <!-- Loop 2: Twin Upper Peaks + Downward Top Arch -> Outer Diagonals -> Outer Concave Sides -> Twin Lower Peaks + Upward Bottom Arch -->
+    <path d="
+      M 155 55
+      Q 200 94 245 55
+      L 313 123
+      C 287 159, 287 225, 313 261
+      L 245 329
+      Q 200 290 155 329
+      L 87 261
+      C 113 225, 113 159, 87 123
+      Z
+    " />
+  </g>
+
+  <!-- Calligraphic S-Curve Flourish Beneath Bottom Apex -->
+  <path
+    filter="url(#dropGlow)"
+    fill="url(#crestMetallic)"
+    d="
+      M 262 346
+      C 276 352, 276 367, 256 371
+      C 232 375, 146 372, 131 378
+      C 123 381, 125 387, 144 389
+      C 167 392, 200 392, 213 398
+      C 220 402, 219 410, 211 410
+      C 207 410, 207 405, 200 402
+      C 185 398, 152 398, 127 393
+      C 110 389, 110 375, 129 370
+      C 150 364, 231 366, 253 361
+      C 263 359, 266 352, 262 346
+      Z
+    "
+  />
+</svg>

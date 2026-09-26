@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #060814;
+  --color-surface-dim: #060814;
+  --color-surface-bright: #1e264a;
+  --color-surface-container-lowest: #04060e;
+  --color-surface-container-low: #0b0f26;
+  --color-surface-container: #111738;
+  --color-surface-container-high: #19214a;
+  --color-surface-container-highest: #232d5e;
+  --color-on-surface: #f8fafc;
+  --color-on-surface-variant: #cbd5e1;
+  --color-inverse-surface: #dee0ff;
+  --color-inverse-on-surface: #111738;
+  --color-outline: #87929a;
+  --color-outline-variant: #2e3856;
+  --color-surface-tint: #38bdf8;
+  --color-primary: #8ed5ff;
+  --color-on-primary: #002b3d;
+  --color-primary-container: #38bdf8;
+  --color-on-primary-container: #041524;
+  --color-inverse-primary: #00668a;
+  --color-secondary: #ddb7ff;
+  --color-on-secondary: #490080;
+  --color-secondary-container: #6f00be;
+  --color-on-secondary-container: #f0dbff;
+  --color-tertiary: #ffc174;
+  --color-on-tertiary: #3b2200;
+  --color-tertiary-container: #f59e0b;
+  --color-on-tertiary-container: #2a1700;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+  --color-primary-fixed: #c4e7ff;
+  --color-primary-fixed-dim: #7bd0ff;
+  --color-on-primary-fixed: #001e2c;
+  --color-on-primary-fixed-variant: #004c69;
+  --color-secondary-fixed: #f0dbff;
+  --color-secondary-fixed-dim: #ddb7ff;
+  --color-on-secondary-fixed: #2c0051;
+  --color-on-secondary-fixed-variant: #6900b3;
+  --color-tertiary-fixed: #ffddb8;
+  --color-tertiary-fixed-dim: #ffb95f;
+  --color-on-tertiary-fixed: #2a1700;
+  --color-on-tertiary-fixed-variant: #653e00;
+  --color-background: #060814;
+  --color-on-background: #f8fafc;
+  --color-surface-variant: #1e264a;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Hanken Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --font-headline-lg: "Space Grotesk", sans-serif;
+  --font-headline-md: "Space Grotesk", sans-serif;
+  --font-headline-sm: "Space Grotesk", sans-serif;
+  --font-display-xl-mobile: "Space Grotesk", sans-serif;
+  --font-display-lg-mobile: "Space Grotesk", sans-serif;
+  --font-label-md: "Space Grotesk", sans-serif;
+  --font-label-sm: "Space Grotesk", sans-serif;
+  --font-body-lg: "Hanken Grotesk", sans-serif;
+  --font-body-md: "Hanken Grotesk", sans-serif;
+  --font-body-sm: "Hanken Grotesk", sans-serif;
+
+  --spacing-gutter: 1.5rem;
+  --spacing-gutter-mobile: 1rem;
+  --spacing-margin: 3rem;
+  --spacing-margin-mobile: 1.25rem;
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-xl: 2.5rem;
+}
+
+@layer base {
+  html,
+  body {
+    width: 100%;
+    min-height: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    background-color: #060814;
+    color: #f8fafc;
+    font-family: "Hanken Grotesk", sans-serif;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.text-display-xl-mobile {
+  font-size: 34px;
+  line-height: 42px;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.text-display-lg-mobile {
+  font-size: 28px;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+.text-headline-lg {
+  font-size: 28px;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+.text-headline-md {
+  font-size: 22px;
+  line-height: 30px;
+  letter-spacing: 0em;
+  font-weight: 600;
+}
+
+.text-headline-sm {
+  font-size: 19px;
+  line-height: 26px;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+}
+
+.text-body-lg {
+  font-size: 17px;
+  line-height: 26px;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+.text-body-md {
+  font-size: 15px;
+  line-height: 24px;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+.text-body-sm {
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+.text-label-md {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.text-label-sm {
+  font-size: 11px;
+  line-height: 15px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

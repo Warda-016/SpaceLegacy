@@ -1,0 +1,6 @@
+{
+  "name": "Space Legacy — Hardware Catalogue",
+  "description": "Interactive NASA hardware catalogue and deep-space telemetry archive exploring 13 historic lunar, Martian, and interstellar missions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
