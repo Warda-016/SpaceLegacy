@@ -3,27 +3,79 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { lookupAnyCosmicWord } from './src/data/cosmicDictionaryData';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
 
 // In-memory server cache for instant repeat dictionary lookups
 const dictionaryCache = new Map<string, Record<string, unknown>>();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
+
+  // Serve static assets (including /audio/*.mp3 with full byte-range support) directly
+  app.use(
+    express.static(path.join(__dirname, 'public'), {
+      acceptRanges: true,
+    })
+  );
+
+  // Universal server-side MP3 TTS proxy so any text on the site plays as real MP3 audio
+  // even in browsers/iframes where window.speechSynthesis is unavailable or muted.
+  app.get('/api/tts', async (req, res) => {
+    const rawText = typeof req.query.text === 'string' ? req.query.text.trim() : '';
+    if (!rawText) {
+      res.status(400).send('Missing text parameter');
+      return;
+    }
+
+    try {
+      // Split text into <= 180 character sentence chunks for TTS
+      const words = rawText.replace(/\s+/g, ' ').split(' ');
+      const chunks: string[] = [];
+      let current = '';
+      for (const word of words) {
+        if ((current + ' ' + word).trim().length > 175) {
+          if (current.trim()) chunks.push(current.trim());
+          current = word;
+        } else {
+          current = (current + ' ' + word).trim();
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+
+      const buffers: Buffer[] = [];
+      for (const chunk of chunks.slice(0, 8)) {
+        const ttsUrl =
+          'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=' +
+          encodeURIComponent(chunk);
+        const ttsRes = await fetch(ttsUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        if (ttsRes.ok) {
+          buffers.push(Buffer.from(await ttsRes.arrayBuffer()));
+        }
+      }
+
+      if (buffers.length === 0) {
+        res.status(502).send('TTS upstream unavailable');
+        return;
+      }
+
+      const combined = Buffer.concat(buffers);
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', String(combined.length));
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(combined);
+    } catch {
+      res.status(500).send('TTS synthesis error');
+    }
+  });
 
   app.post('/api/cosmic-dictionary', async (req, res) => {
     const rawTerm = typeof req.body?.term === 'string' ? req.body.term.trim() : '';
@@ -39,8 +91,22 @@ async function startServer() {
     }
 
     try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Missing GEMINI_API_KEY');
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-3-flash-preview',
         contents: `Define and explain the word, acronym, phrase, or concept "${rawTerm}" for a curious young explorer (ages 10-15) visiting the NASA "Space Legacy: Abandoned But Not Lost" interactive museum. Even if "${rawTerm}" is an everyday word, custom term, or general science/engineering word, connect it clearly to how it works in everyday life and in space exploration!`,
         config: {
           systemInstruction:
@@ -122,17 +188,20 @@ async function startServer() {
 
       dictionaryCache.set(cacheKey, entry);
       res.json(entry);
-    } catch (error: unknown) {
-      const errMsg =
-        error instanceof Error ? error.message : 'Failed to generate AI definition';
-      res.status(500).json({ error: errMsg });
+    } catch {
+      // Return local curated/synthesized cosmic dictionary entry with HTTP 200 so client never hits 500 errors
+      const fallbackEntry = lookupAnyCosmicWord(rawTerm);
+      res.json(fallbackEntry);
     }
   });
 
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

@@ -1,4 +1,6 @@
-// Authentic NASA Public Domain Audio Feeds (Locally cached & amplified to max loudness)
+// Authentic NASA Public Domain Audio Feeds (Mastered 44.1kHz Stereo Broadcast Loudness)
+import { speakTextLoudly, stopLoudNarration } from './loudStoryAudio';
+
 export interface NasaAudioTrack {
   id: string;
   title: string;
@@ -38,73 +40,111 @@ export const NASA_AUTHENTIC_AUDIO_FEEDS: NasaAudioTrack[] = [
   },
 ];
 
-let activeNasaAudio: HTMLAudioElement | null = null;
-let audioCtx: AudioContext | null = null;
-let gainNode: GainNode | null = null;
+let persistentNasaDomAudio: HTMLAudioElement | null = null;
+let activeNasaToken = 0;
+
+function getOrCreateNasaDomAudio(): HTMLAudioElement | null {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return null;
+  }
+  const existing = document.getElementById(
+    'space-legacy-nasa-feed-player'
+  ) as HTMLAudioElement | null;
+  if (existing) {
+    existing.volume = 1.0;
+    existing.muted = false;
+    persistentNasaDomAudio = existing;
+    return existing;
+  }
+  if (!persistentNasaDomAudio) {
+    const el = document.createElement('audio');
+    el.id = 'space-legacy-nasa-feed-fallback';
+    el.preload = 'auto';
+    el.volume = 1.0;
+    el.muted = false;
+    el.style.display = 'none';
+    document.body.appendChild(el);
+    persistentNasaDomAudio = el;
+  }
+  persistentNasaDomAudio.volume = 1.0;
+  persistentNasaDomAudio.muted = false;
+  return persistentNasaDomAudio;
+}
 
 export function playAuthenticNasaSnippet(
   trackId?: string,
   onEndedCallback?: () => void
 ) {
-  try {
-    const track =
-      NASA_AUTHENTIC_AUDIO_FEEDS.find((t) => t.id === trackId) ||
-      NASA_AUTHENTIC_AUDIO_FEEDS[0];
+  const track =
+    NASA_AUTHENTIC_AUDIO_FEEDS.find((t) => t.id === trackId) ||
+    NASA_AUTHENTIC_AUDIO_FEEDS[0];
 
-    if (activeNasaAudio) {
-      activeNasaAudio.pause();
-      activeNasaAudio.currentTime = 0;
-    }
+  stopAuthenticNasaSnippet();
+  stopLoudNarration();
+  const myToken = ++activeNasaToken;
 
-    const audio = new Audio(track.url);
-    audio.volume = 1.0;
-    audio.loop = true;
-
-    // Route through Web Audio API GainNode to boost signal to maximum audible loudness
+  const audio = getOrCreateNasaDomAudio();
+  if (audio) {
     try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      if (AudioContextClass) {
-        if (!audioCtx) {
-          audioCtx = new AudioContextClass();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-        const source = audioCtx.createMediaElementSource(audio);
-        gainNode = audioCtx.createGain();
-        gainNode.gain.value = 2.0; // 200% extra preamp boost on top of loudnorm MP3
-        source.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
+      if (!audio.src.endsWith(track.url)) {
+        audio.src = track.url;
       }
+      audio.volume = 1.0;
+      audio.muted = false;
+      audio.loop = true;
+
+      if (onEndedCallback) {
+        audio.onended = onEndedCallback;
+      }
+
+      audio.onerror = () => {
+        if (myToken !== activeNasaToken) return;
+        speakTextLoudly({
+          text: `${track.title}. ${track.description}`,
+          onEnd: onEndedCallback,
+        });
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          if (myToken !== activeNasaToken) return;
+          speakTextLoudly({
+            text: `${track.title}. ${track.description}`,
+            onEnd: onEndedCallback,
+          });
+        });
+      }
+      return;
     } catch {
-      // Fallback to native HTMLAudioElement at volume 1.0
+      // fall through
     }
-
-    if (onEndedCallback) {
-      audio.onended = onEndedCallback;
-    }
-
-    activeNasaAudio = audio;
-    audio.play().catch((err) => {
-      console.warn('Audio playback warning:', err);
-    });
-  } catch {
-    // Ignore audio errors
   }
+
+  speakTextLoudly({
+    text: `${track.title}. ${track.description}`,
+    onEnd: onEndedCallback,
+  });
 }
 
 export function stopAuthenticNasaSnippet() {
-  if (activeNasaAudio) {
-    activeNasaAudio.pause();
-    activeNasaAudio.currentTime = 0;
-    activeNasaAudio = null;
+  activeNasaToken++;
+  const domPlayer =
+    typeof document !== 'undefined'
+      ? (document.getElementById(
+          'space-legacy-nasa-feed-player'
+        ) as HTMLAudioElement | null)
+      : null;
+
+  for (const el of [domPlayer, persistentNasaDomAudio]) {
+    if (el) {
+      try {
+        el.onended = null;
+        el.onerror = null;
+        el.pause();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
   }
 }
-
-export function playCelebrationFanfare() {}
-export function playDiscoveryPop() {}
-export function playQuizSuccessChime() {}
-export function playGentleHintTone() {}

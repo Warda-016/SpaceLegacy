@@ -1,0 +1,103 @@
+================================================================================
+SPACE LEGACY — ABANDONED BUT NOT LOST
+ESSENTIAL REQUIREMENTS & INSTRUCTIONS FOR RUNNING OUTSIDE GOOGLE AI STUDIO
+================================================================================
+
+This project is 100% self-contained and portable. All mission photography,
+illustrations, NASA telemetry data, and broadcast-mastered stereo MP3 audio
+files are bundled locally inside the `/public` and `/src` directories.
+
+--------------------------------------------------------------------------------
+1. ESSENTIAL SYSTEM REQUIREMENTS
+--------------------------------------------------------------------------------
+To run or build this website on your own computer or an external server, you
+only need:
+
+  * Node.js: Version 20.0.0 or higher (Node.js 22 LTS recommended)
+    Download from: https://nodejs.org/
+  * npm: Version 10.0.0 or higher (included automatically with Node.js)
+  * Operating System: Windows 10/11, macOS, or Linux
+  * Web Browser: Any modern browser (Chrome, Edge, Firefox, Safari) with
+    system speaker/headphone output enabled.
+
+--------------------------------------------------------------------------------
+2. ENVIRONMENT VARIABLES (.env CONFIGURATION)
+--------------------------------------------------------------------------------
+The website works out-of-the-box EVEN WITHOUT ANY API KEYS because it includes
+a complete built-in offline Cosmic Dictionary fallback engine.
+
+However, if you want live Gemini AI definitions for custom words in the
+Cosmic Dictionary:
+
+  1. Duplicate `.env.example` and rename the copy to `.env` in the project root:
+       cp .env.example .env
+
+  2. (Optional) Add your Google Gemini API key inside `.env`:
+       GEMINI_API_KEY="your_actual_gemini_api_key_here"
+       PORT=3000
+
+     * Note: If `GEMINI_API_KEY` is omitted or left blank, the server and
+       client automatically fall back to the built-in local Cosmic Dictionary
+       without throwing any errors.
+
+--------------------------------------------------------------------------------
+3. HOW TO RUN LOCALLY ON YOUR COMPUTER (DEVELOPMENT MODE)
+--------------------------------------------------------------------------------
+Open a terminal in the root folder of this exported project and run:
+
+  Step 1 — Install all dependencies:
+    npm install
+
+  Step 2 — Start the full-stack server (Express + Vite on Port 3000):
+    npm run dev
+
+  Step 3 — Open in your browser:
+    http://localhost:3000
+
+--------------------------------------------------------------------------------
+4. HOW TO BUILD & RUN IN PRODUCTION MODE
+--------------------------------------------------------------------------------
+To compile the optimized production bundle (`dist/` folder) and run the
+production Express server:
+
+  Step 1 — Install dependencies:
+    npm install
+
+  Step 2 — Build the frontend production bundle:
+    npm run build
+
+  Step 3 — Start the production server:
+    NODE_ENV=production npm start
+    (On Windows PowerShell: $env:NODE_ENV="production"; npm start)
+
+  The production server will serve both the compiled static assets from `dist/`
+  and the `/api/cosmic-dictionary` endpoint on `http://localhost:3000` (or the
+  port specified by the `PORT` environment variable).
+
+--------------------------------------------------------------------------------
+5. DEPLOYING TO EXTERNAL CLOUD PLATFORMS
+--------------------------------------------------------------------------------
+Option A — Full-Stack Node.js Hosting (Render, Railway, Fly.io, Cloud Run, Heroku):
+  * Build Command:   npm install && npm run build
+  * Start Command:   NODE_ENV=production npm start
+  * Environment:     Set `NODE_ENV=production` (and optionally `GEMINI_API_KEY`)
+  * Port:            Automatically detects `process.env.PORT` (defaults to 3000)
+
+Option B — Pure Static Hosting (Vercel, Netlify, Cloudflare Pages, GitHub Pages):
+  * Build Command:   npm run build
+  * Output Folder:   dist
+  * Note: Even on pure static hosting without the Node.js backend, 100% of the
+    13 mission stories, interactive scroll stories, audio narrations, NASA
+    audio feeds, quizzes, badges, and the built-in Cosmic Dictionary work
+    offline in the browser without errors.
+
+--------------------------------------------------------------------------------
+6. AUDIO & STATIC ASSETS CHECKLIST
+--------------------------------------------------------------------------------
+When copying or zipping this project, ensure the `public/` folder is included:
+  * `public/audio/*.mp3`   — 39 pre-mastered 44.1kHz stereo MP3 files (NASA
+                             archival audio feeds + 18 story narration clips
+                             for InSight, Perseverance, and Curiosity).
+  * `public/images/**`     — Local mission hardware imagery, sector banners,
+                             and story scene illustrations.
+================================================================================

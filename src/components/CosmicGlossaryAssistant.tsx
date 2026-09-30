@@ -15,6 +15,7 @@ import {
   isKnownCosmicTerm,
   lookupAnyCosmicWord,
 } from '../data/cosmicDictionaryData';
+import { speakTextLoudly, stopLoudNarration } from '../utils/loudStoryAudio';
 
 export { COSMIC_GLOSSARY_TERMS, lookupAnyCosmicWord };
 export type { GlossaryEntry };
@@ -65,17 +66,13 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
   }, [aiGeneratedTerms]);
 
   const stopSpeech = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopLoudNarration();
     setIsSpeaking(false);
   };
 
   useEffect(() => {
     return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopLoudNarration();
     };
   }, []);
 
@@ -203,25 +200,19 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
   }, []);
 
   const toggleSpeakDefinition = (entry: GlossaryEntry) => {
-    if (!('speechSynthesis' in window)) return;
-
     // Second click turns audio off immediately
-    if (isSpeaking || window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+    if (isSpeaking) {
+      stopLoudNarration();
       setIsSpeaking(false);
       return;
     }
 
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(
-      `${entry.term}. ${entry.kidDefinition}`
-    );
-    utter.rate = 0.96;
-    utter.pitch = 1.05;
-    utter.onend = () => setIsSpeaking(false);
-    utter.onerror = () => setIsSpeaking(false);
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utter);
+    speakTextLoudly({
+      text: `${entry.term}. ${entry.kidDefinition} ${entry.playfulAnalogy}`,
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false),
+    });
   };
 
   const displayUserName = userName?.trim() || 'Explorer';

@@ -1,19 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Award,
   CheckCircle2,
   ChevronLeft,
-  ChevronRight,
   ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
 import { AgeTrack, MissionHardware } from '../data/missions';
 import { getMissionStoryChapters } from '../data/storyChapters';
-import { GlossaryText } from './CosmicGlossaryAssistant';
+import { stopLoudNarration } from '../utils/loudStoryAudio';
+import { AlsepScrollStory } from './AlsepScrollStory';
+import { ApolloLandingScrollStory } from './ApolloLandingScrollStory';
+import { CassiniScrollStory } from './CassiniScrollStory';
 import { CuriosityScrollStory } from './CuriosityScrollStory';
 import { InSightScrollStory } from './InSightScrollStory';
+import { LroScrollStory } from './LroScrollStory';
+import { NewHorizonsScrollStory } from './NewHorizonsScrollStory';
+import { OpportunityScrollStory } from './OpportunityScrollStory';
 import { PerseveranceScrollStory } from './PerseveranceScrollStory';
+import { PhoenixScrollStory } from './PhoenixScrollStory';
+import { PioneerScrollStory } from './PioneerScrollStory';
+import { SpiritScrollStory } from './SpiritScrollStory';
+import { VoyagerScrollStory } from './VoyagerScrollStory';
 
 export type DossierTabMode = 'story' | 'quiz';
 
@@ -30,7 +38,6 @@ interface MissionDossierModalProps {
 export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
   mission,
   initialMode = 'story',
-  ageTrack,
   onPerfectQuizScore,
   onOpenGlossaryTerm,
   onClose,
@@ -38,29 +45,31 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
   const [activeTab, setActiveTab] = useState<DossierTabMode>(
     initialMode === 'quiz' ? 'quiz' : 'story'
   );
-  const [chapterIndex, setChapterIndex] = useState<number>(0);
   const [chapterQuizAnswers, setChapterQuizAnswers] = useState<
     Record<number, number>
   >({});
-  const [completedChapters, setCompletedChapters] = useState<number[]>([]);
 
   // 5th Question state
   const [masterQuizAnswer, setMasterQuizAnswer] = useState<number | null>(null);
   const [hasAwardedPerfect, setHasAwardedPerfect] = useState<boolean>(false);
 
   useEffect(() => {
+    stopLoudNarration();
     setActiveTab(initialMode === 'quiz' ? 'quiz' : 'story');
-    setChapterIndex(0);
     setChapterQuizAnswers({});
-    setCompletedChapters([]);
     setMasterQuizAnswer(null);
     setHasAwardedPerfect(false);
   }, [mission?.id, initialMode]);
 
+  useEffect(() => {
+    return () => {
+      stopLoudNarration();
+    };
+  }, []);
+
   if (!mission) return null;
 
   const chapters = getMissionStoryChapters(mission.id, mission);
-  const currentChapter = chapters[chapterIndex];
 
   const sectorTrackLabel =
     mission.destination === 'moon'
@@ -98,24 +107,12 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
     }
   };
 
-  const handleSelectChapter = (idx: number) => {
-    setChapterIndex(idx);
-  };
-
   const handleChapterQuizSelect = (cIdx: number, optionIdx: number) => {
     const nextAnswers = {
       ...chapterQuizAnswers,
       [cIdx]: optionIdx,
     };
     setChapterQuizAnswers(nextAnswers);
-
-    const targetChapter = chapters[cIdx];
-    if (targetChapter && optionIdx === targetChapter.quiz.correctIndex) {
-      if (!completedChapters.includes(cIdx)) {
-        setCompletedChapters((prev) => [...prev, cIdx]);
-      }
-    }
-
     checkAndAwardPerfectScore(nextAnswers, masterQuizAnswer);
   };
 
@@ -183,7 +180,7 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
         {/* ========================================================= */}
         {/* TAB 1: STORY                                              */}
         {/* ========================================================= */}
-        {activeTab === 'story' && currentChapter && (
+        {activeTab === 'story' && (
           <div className="space-y-4 sm:space-y-5 w-full">
             {mission.id === 'perseverance-rover' ? (
               <PerseveranceScrollStory
@@ -197,123 +194,46 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
               <CuriosityScrollStory
                 onStartQuiz={() => setActiveTab('quiz')}
               />
+            ) : mission.id === 'lro-orbiter' ? (
+              <LroScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'phoenix-lander' ? (
+              <PhoenixScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'new-horizons' ? (
+              <NewHorizonsScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'opportunity-rover' ? (
+              <OpportunityScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'spirit-rover' ? (
+              <SpiritScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'cassini-orbiter' ? (
+              <CassiniScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'voyager-1-2' ? (
+              <VoyagerScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'pioneer-10-11' ? (
+              <PioneerScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
+            ) : mission.id === 'alsep-stations' ? (
+              <AlsepScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
             ) : (
-              <>
-                {/* Chapter Stepper Pills */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 w-full">
-                  {chapters.map((chap, idx) => {
-                    const isCurrent = idx === chapterIndex;
-                    const isDone = completedChapters.includes(idx);
-                    return (
-                      <button
-                        key={chap.number}
-                        type="button"
-                        onClick={() => handleSelectChapter(idx)}
-                        className={`text-left p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2 w-full min-w-0 ${
-                          isCurrent
-                            ? 'bg-sky-400/15 border-sky-400 text-white shadow-[0_0_20px_rgba(56,189,248,0.2)]'
-                            : isDone
-                            ? 'bg-emerald-500/10 border-emerald-400/35 text-emerald-200'
-                            : 'bg-[#131936] border-white/10 text-slate-300 hover:border-white/25'
-                        }`}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <span className="block font-mono text-[10px] sm:text-xs uppercase tracking-widest text-sky-300">
-                            Chapter {chap.number}
-                          </span>
-                          <span className="font-headline font-bold text-xs sm:text-sm md:text-base truncate block">
-                            {chap.title}
-                          </span>
-                        </div>
-                        {isDone && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Story Reader Card */}
-                <div className="rounded-2xl sm:rounded-3xl bg-[#111733] border border-sky-400/25 p-4 sm:p-6 space-y-4 sm:space-y-5 w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-white/10 pb-4">
-                    <div className="min-w-0">
-                      <span className="font-mono text-xs uppercase tracking-widest text-sky-300 font-bold block break-words">
-                        Chapter {currentChapter.number} of {chapters.length} •{' '}
-                        {currentChapter.subtitle}
-                      </span>
-                      <h3 className="font-headline text-lg sm:text-xl md:text-2xl font-bold text-white mt-0.5 break-words">
-                        {currentChapter.title}
-                      </h3>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onOpenGlossaryTerm &&
-                        onOpenGlossaryTerm(currentChapter.telemetryCallout)
-                      }
-                      className="px-3 py-1.5 rounded-xl bg-[#060814] hover:border-sky-400 border border-sky-400/30 font-mono text-xs text-sky-300 self-start sm:self-auto cursor-pointer transition-colors max-w-full break-words text-left"
-                      title="Click to explain this telemetry readout in the Cosmic Dictionary"
-                    >
-                      {currentChapter.telemetryCallout}
-                    </button>
-                  </div>
-
-                  {/* Story Paragraphs with Universal Interactive Words */}
-                  <div className="space-y-4 text-slate-100 text-xs sm:text-sm md:text-base leading-relaxed">
-                    {currentChapter.storyByTrack[ageTrack].map(
-                      (paragraph, pIdx) => (
-                        <p key={pIdx} className="leading-relaxed break-words">
-                          {onOpenGlossaryTerm ? (
-                            <GlossaryText
-                              text={paragraph}
-                              onSelectTerm={onOpenGlossaryTerm}
-                            />
-                          ) : (
-                            paragraph
-                          )}
-                        </p>
-                      )
-                    )}
-                  </div>
-
-                  {/* Chapter Prev / Next Controls */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <button
-                      type="button"
-                      disabled={chapterIndex === 0}
-                      onClick={() =>
-                        handleSelectChapter(Math.max(0, chapterIndex - 1))
-                      }
-                      className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-40 border border-white/10 text-xs sm:text-sm font-headline font-bold uppercase tracking-wider text-white flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <ChevronLeft className="w-4 h-4 shrink-0" />
-                      <span>Previous Chapter</span>
-                    </button>
-
-                    {chapterIndex < chapters.length - 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSelectChapter(chapterIndex + 1)}
-                        className="px-5 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-[#060814] text-xs sm:text-sm font-headline font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-lg"
-                      >
-                        <span>
-                          Next Chapter ({chapterIndex + 2}/{chapters.length})
-                        </span>
-                        <ChevronRight className="w-4 h-4 shrink-0" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('quiz')}
-                        className="px-5 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-[#060814] text-xs sm:text-sm font-headline font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-lg"
-                      >
-                        <span>Take Cosmic Quiz</span>
-                        <Award className="w-4 h-4 shrink-0" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
+              <ApolloLandingScrollStory
+                onStartQuiz={() => setActiveTab('quiz')}
+              />
             )}
           </div>
         )}
