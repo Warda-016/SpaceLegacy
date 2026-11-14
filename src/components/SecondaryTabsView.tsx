@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Award,
   BookOpen,
-  Box,
   CheckCircle2,
   Flame,
   Lock,
@@ -19,24 +18,7 @@ import {
 } from '../data/missions';
 import { DossierTabMode } from './MissionDossierModal';
 
-/**
- * Minimal Playground tab view
- */
-export const PlaygroundView: React.FC = () => {
-  return (
-    <div className="w-full max-w-full min-h-[65vh] flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl bg-[#0b1026]/70 border border-dashed border-sky-400/25 p-6 sm:p-8 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-sky-400/10 border border-sky-400/30 flex items-center justify-center text-sky-300 mb-4">
-        <Box className="w-7 h-7" />
-      </div>
-      <h1 className="font-headline text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
-        Playground
-      </h1>
-      <p className="font-mono text-xs sm:text-sm uppercase tracking-widest text-sky-300/80 mt-2">
-        Interactive Exploration Sandbox
-      </p>
-    </div>
-  );
-};
+export { PlaygroundView } from './PlaygroundView';
 
 interface StatusMapViewProps {
   onOpenMissionDossier: (mission: MissionHardware, mode?: DossierTabMode) => void;
