@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface CassiniScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const CASSINI_SCENES: StoryScene[] = [
 export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = CASSINI_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `cassini-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < CASSINI_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(CASSINI_SCENES, 'cassini');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -365,7 +266,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
               {idx === 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/cassini-orbiter.jpg"
                       alt="NASA Cassini spacecraft at Saturn with the golden Huygens probe"
                       className="w-full h-full object-cover object-center"
@@ -381,7 +282,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       <rect x="10" y="10" width="540" height="210" rx="16" fill="#0d1536" stroke="#38bdf8" strokeWidth="2" />
                       <text x="280" y="36" textAnchor="middle" fill="#fde047" fontSize="14" fontWeight="bold">
                         ☄️ 7-YEAR COSMIC PINBALL BOOST TO REACH SATURN (1997 – 2004)!
@@ -424,7 +325,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 1 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
                     {/* Panel 1: Dish Shield Forward */}
                     <g transform="translate(100, 115)">
                       <rect x="-88" y="-98" width="176" height="196" rx="14" fill="#10193a" stroke="#38bdf8" strokeWidth="2" />
@@ -492,7 +393,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
               {idx === 2 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/cassini-huygens-titan.jpg"
                       alt="Real surface photo of Saturn's moon Titan taken by the Huygens lander"
                       className="w-full h-full object-cover object-center"
@@ -508,7 +409,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-amber-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       {/* Panel 1: Golden Saucer Detaches */}
                       <g transform="translate(95, 115)">
                         <rect x="-80" y="-98" width="160" height="196" rx="14" fill="#1e1510" stroke="#fbbf24" strokeWidth="2" />
@@ -579,7 +480,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/cassini-enceladus-plumes.jpg"
                       alt="Real NASA Cassini photo of water geysers erupting from Saturn's moon Enceladus"
                       className="w-full h-full object-cover object-center"
@@ -595,7 +496,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       <rect x="10" y="10" width="540" height="210" rx="16" fill="#08152e" stroke="#38bdf8" strokeWidth="2" />
                       <text x="280" y="34" textAnchor="middle" fill="#fde047" fontSize="14" fontWeight="bold">
                         🌊 CASSINI FLIES THROUGH ENCELADUS’S ALIEN WATER FOUNTAINS!
@@ -634,7 +535,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 4 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
                     {/* Left: Giant Spinning Hexagon Storm */}
                     <g transform="translate(175, 118)">
                       <polygon
@@ -679,7 +580,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
               {idx === 5 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-emerald-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/cassini-grand-finale.jpg"
                       alt="NASA illustration of Cassini diving between Saturn and its rings during the Grand Finale"
                       className="w-full h-full object-cover object-center"
@@ -695,7 +596,7 @@ export const CassiniScrollStory: React.FC<CassiniScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-emerald-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       {/* Panel 1: Almost Out of Fuel */}
                       <g transform="translate(95, 115)">
                         <rect x="-80" y="-98" width="160" height="196" rx="14" fill="#231212" stroke="#f87171" strokeWidth="2" />

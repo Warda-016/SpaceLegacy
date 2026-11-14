@@ -92,6 +92,16 @@ let activeUtterance: SpeechSynthesisUtterance | null = null;
 let speechTimeoutId: number | null = null;
 let activePlaybackToken = 0;
 
+function pauseAmbientNasaPlayerIfPlaying(): void {
+  if (typeof document === 'undefined') return;
+  const nasaPlayer = document.getElementById(
+    'space-legacy-nasa-feed-player'
+  ) as HTMLAudioElement | null;
+  if (nasaPlayer && !nasaPlayer.paused) {
+    nasaPlayer.pause();
+  }
+}
+
 function getOrCreateDomAudio(): HTMLAudioElement | null {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return null;
@@ -99,7 +109,7 @@ function getOrCreateDomAudio(): HTMLAudioElement | null {
   if (!persistentDomAudio) {
     const el = document.createElement('audio');
     el.id = 'space-legacy-narration-audio';
-    el.preload = 'auto';
+    el.preload = 'none';
     el.volume = 1.0;
     el.muted = false;
     el.style.display = 'none';
@@ -125,12 +135,18 @@ export function stopLoudNarration(): void {
       persistentDomAudio.onerror = null;
       persistentDomAudio.pause();
       persistentDomAudio.currentTime = 0;
-    } catch {
-      // ignore cleanup errors
+    } catch (err) {
+      console.warn('Narration audio cleanup warning:', err);
     }
   }
 
-  activeUtterance = null;
+  if (activeUtterance) {
+    activeUtterance.onstart = null;
+    activeUtterance.onend = null;
+    activeUtterance.onerror = null;
+    activeUtterance = null;
+  }
+
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
       if (
@@ -139,8 +155,8 @@ export function stopLoudNarration(): void {
       ) {
         window.speechSynthesis.cancel();
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('SpeechSynthesis cancel warning:', err);
     }
   }
 }
@@ -207,13 +223,14 @@ function fallbackBrowserSpeechSynthesis(
           };
 
           window.speechSynthesis.speak(utterance);
-        } catch {
+        } catch (err) {
+          console.warn('SpeechSynthesis speak error:', err);
           options.onError?.();
         }
       }, 60);
       return;
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn('SpeechSynthesis initialization warning:', err);
     }
   }
 
@@ -232,11 +249,13 @@ export function speakTextLoudly(options: {
   onError?: () => void;
 }): void {
   stopLoudNarration();
+  pauseAmbientNasaPlayerIfPlaying();
   const myToken = ++activePlaybackToken;
 
+  const trimmed = options.text.trim().slice(0, 600);
   const audio = getOrCreateDomAudio();
-  if (audio) {
-    const ttsStreamUrl = `/api/tts?text=${encodeURIComponent(options.text)}`;
+  if (audio && trimmed) {
+    const ttsStreamUrl = `/api/tts?text=${encodeURIComponent(trimmed)}`;
     audio.src = ttsStreamUrl;
     audio.loop = false;
     audio.volume = 1.0;
@@ -262,8 +281,9 @@ export function speakTextLoudly(options: {
     options.onStart?.();
 
     if (playPromise !== undefined) {
-      playPromise.catch(() => {
+      playPromise.catch((err) => {
         if (myToken !== activePlaybackToken) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         fallbackBrowserSpeechSynthesis(myToken, {
           text: options.text,
           onStart: undefined,
@@ -286,6 +306,7 @@ export async function playLoudNarration(options: {
   onError?: () => void;
 }): Promise<void> {
   stopLoudNarration();
+  pauseAmbientNasaPlayerIfPlaying();
   const myToken = ++activePlaybackToken;
 
   const singleUrl = SINGLE_AUDIO_MAP[options.clipKey];
@@ -319,8 +340,9 @@ export async function playLoudNarration(options: {
     options.onStart?.();
 
     if (playPromise !== undefined) {
-      playPromise.catch(() => {
+      playPromise.catch((err) => {
         if (myToken !== activePlaybackToken) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         fallbackBrowserSpeechSynthesis(myToken, {
           text: options.fallbackText,
           onStart: undefined,

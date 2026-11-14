@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface NewHorizonsScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const NEW_HORIZONS_SCENES: StoryScene[] = [
 export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = NEW_HORIZONS_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `newhorizons-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < NEW_HORIZONS_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(NEW_HORIZONS_SCENES, 'newhorizons');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -368,7 +269,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/newhorizons-launch.jpg"
                         alt="Real NASA photo of Atlas V rocket launching New Horizons from Florida in January 2006"
                         className="w-full h-full object-cover object-center"
@@ -384,7 +285,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
                     </div>
 
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/new-horizons.jpg"
                         alt="Real NASA photo of piano-sized New Horizons spacecraft wrapped in gold thermal foil in cleanroom"
                         className="w-full h-full object-cover object-center"
@@ -405,7 +306,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
                     <span className="text-xs sm:text-sm font-bold text-sky-300 uppercase tracking-wider block text-center">
                       🎬 Speed Race to the Moon: 3 Days vs. 9 Hours!
                     </span>
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 360 195"
                       className="w-full h-44 overflow-visible my-auto"
                     >
@@ -456,7 +357,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
               {/* SCENE 2: JUPITER GRAVITY SLINGSHOT & 7-YEAR HIBERNATION NAP */}
               {idx === 1 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 245"
                     className="w-full h-60 overflow-visible"
                   >
@@ -551,7 +452,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/newhorizons-pluto-heart.jpg"
                         alt="Real NASA New Horizons close-up photo of mountains and nitrogen ice plains inside Pluto's Heart"
                         className="w-full h-full object-cover object-center"
@@ -567,7 +468,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
                     </div>
 
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/newhorizons-pluto-mountains.jpg"
                         alt="Real NASA New Horizons photo of Pluto's mountains and blue atmospheric haze layers"
                         className="w-full h-full object-cover object-center"
@@ -588,7 +489,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
                     <span className="text-xs sm:text-sm font-bold text-sky-300 uppercase tracking-wider block text-center">
                       🎬 Live Animation: Pluto’s 1,000-Mile Frozen Heart!
                     </span>
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 360 195"
                       className="w-full h-44 overflow-visible my-auto"
                     >
@@ -637,7 +538,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/newhorizons-pluto-charon.jpg"
                       alt="Real NASA New Horizons color portrait of Pluto and its large moon Charon"
                       className="w-full h-full object-cover object-center"
@@ -654,7 +555,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
 
                   {/* Kid-Friendly Animation: Student Dust Counter Catching Space Dust */}
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 460 225"
                       className="w-full h-56 overflow-visible"
                     >
@@ -730,7 +631,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
               {/* SCENE 5: ARROKOTH — THE KUIPER BELT SPACE SNOWMAN (4 BILLION MILES AWAY!) */}
               {idx === 4 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 235"
                     className="w-full h-56 overflow-visible"
                   >
@@ -816,7 +717,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
               {idx === 5 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/newhorizons-pluto-crescent.jpg"
                       alt="Real NASA New Horizons farewell photograph looking back at Pluto's glowing atmospheric crescent"
                       className="w-full h-full object-cover object-center"
@@ -833,7 +734,7 @@ export const NewHorizonsScrollStory: React.FC<NewHorizonsScrollStoryProps> = ({
 
                   {/* Kid-Friendly Animation: 60+ AU Away & 8-Hour Radio Signal Delay */}
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 460 225"
                       className="w-full h-56 overflow-visible"
                     >

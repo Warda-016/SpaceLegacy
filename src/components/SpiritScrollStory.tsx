@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface SpiritScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const SPIRIT_SCENES: StoryScene[] = [
 export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = SPIRIT_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `spirit-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < SPIRIT_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(SPIRIT_SCENES, 'spirit');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -365,7 +266,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
               {idx === 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/spirit-rover.jpg"
                       alt="NASA Spirit Mars Exploration Rover (MER-A) on Mars"
                       className="w-full h-full object-cover object-center"
@@ -381,7 +282,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       {/* Panel 1: Folded Inside Nosecone */}
                       <g transform="translate(95, 115)">
                         <rect x="-80" y="-98" width="160" height="196" rx="14" fill="#10193a" stroke="#38bdf8" strokeWidth="2" />
@@ -451,7 +352,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 1 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 680 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 680 230" className="w-full h-56 overflow-visible">
                     {/* Ground */}
                     <path d="M 15 190 L 665 190 L 665 222 L 15 222 Z" fill="#7c2d12" stroke="#fb923c" strokeWidth="2" />
 
@@ -519,7 +420,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 2 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
                     {/* Panel 1: Dusty Solar Wings */}
                     <g transform="translate(100, 115)">
                       <rect x="-88" y="-98" width="176" height="196" rx="14" fill="#231212" stroke="#f87171" strokeWidth="2" />
@@ -592,7 +493,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/spirit-husband-hill.jpg"
                       alt="NASA Spirit Rover view from the summit of Husband Hill on Mars"
                       className="w-full h-full object-cover object-center"
@@ -608,7 +509,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       <path d="M 20 205 L 150 195 L 430 55 L 540 55 L 540 218 L 20 218 Z" fill="#7c2d12" stroke="#fb923c" strokeWidth="3" />
                       <path d="M 45 192 Q 230 150 420 50" fill="none" stroke="#fde047" strokeWidth="3.5" strokeDasharray="8 6" />
 
@@ -652,7 +553,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
               {idx === 4 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-emerald-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/spirit-silica-trench.jpg"
                       alt="NASA Spirit Rover bright white silica soil uncovered by its stuck wheel on Mars"
                       className="w-full h-full object-cover object-center"
@@ -668,7 +569,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-emerald-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       {/* Panel 1: 1 Wheel Breaks -> Drives Backward */}
                       <g transform="translate(95, 115)">
                         <rect x="-80" y="-98" width="160" height="196" rx="14" fill="#1e132a" stroke="#f87171" strokeWidth="2" />
@@ -738,7 +639,7 @@ export const SpiritScrollStory: React.FC<SpiritScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 5 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
                     {/* Panel 1: 90 Days Goal vs 2,210 Days Actual */}
                     <g transform="translate(100, 115)">
                       <rect x="-88" y="-98" width="176" height="196" rx="14" fill="#101836" stroke="#38bdf8" strokeWidth="2" />

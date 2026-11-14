@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface VoyagerScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const VOYAGER_SCENES: StoryScene[] = [
 export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = VOYAGER_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `voyager-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < VOYAGER_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(VOYAGER_SCENES, 'voyager');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -365,7 +266,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
               {idx === 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/voyager-1.jpg"
                       alt="NASA Voyager deep space probe with 12-foot dish antenna and magnetometer boom"
                       className="w-full h-full object-cover object-center"
@@ -381,7 +282,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       <rect x="10" y="10" width="540" height="210" rx="16" fill="#0d1536" stroke="#38bdf8" strokeWidth="2" />
                       <text x="280" y="34" textAnchor="middle" fill="#fde047" fontSize="14" fontWeight="bold">
                         🪐 THE 176-YEAR &ldquo;GRAND TOUR&rdquo; GRAVITY SLINGSHOT PATH!
@@ -435,7 +336,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
               {idx === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/voyager-io-volcano.jpg"
                       alt="Real NASA Voyager 1 photo of a volcano erupting on Jupiter's moon Io"
                       className="w-full h-full object-cover object-center"
@@ -451,7 +352,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-amber-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       {/* Panel 1: Io Erupting Volcanoes */}
                       <g transform="translate(145, 115)">
                         <rect x="-125" y="-95" width="250" height="190" rx="14" fill="#231212" stroke="#f97316" strokeWidth="2" />
@@ -494,7 +395,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 2 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
                     {/* Left: Sideways Uranus (1986) */}
                     <g transform="translate(155, 115)">
                       <rect x="-135" y="-96" width="270" height="192" rx="16" fill="#0b1d36" stroke="#38bdf8" strokeWidth="2" />
@@ -541,7 +442,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/voyager-pale-blue-dot.jpg"
                       alt="Real NASA Voyager 1 Pale Blue Dot photograph showing Earth in a sunbeam from 3.7 billion miles away"
                       className="w-full h-full object-cover object-center"
@@ -557,7 +458,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       <rect x="10" y="10" width="540" height="210" rx="16" fill="#060a1c" stroke="#38bdf8" strokeWidth="2" />
                       {/* Sunbeam stripe */}
                       <polygon points="340,12 410,12 485,218 415,218" fill="#fbbf24" opacity="0.18" />
@@ -593,7 +494,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
               {idx === 4 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/voyager-golden-record.jpg"
                       alt="Real NASA photo of the gold-plated Voyager Golden Record cover"
                       className="w-full h-full object-cover object-center"
@@ -609,7 +510,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-amber-400/35 p-3 sm:p-4 flex items-center justify-center">
-                    <svg viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
+                    <svg aria-hidden="true" viewBox="0 0 560 230" className="w-full h-60 overflow-visible">
                       <rect x="10" y="10" width="540" height="210" rx="16" fill="#0a0f29" stroke="#fbbf24" strokeWidth="2" />
                       <text x="280" y="34" textAnchor="middle" fill="#fde047" fontSize="14" fontWeight="bold">
                         🌌 POPPING OUT OF THE SUN’S BUBBLE INTO INTERSTELLAR SPACE!
@@ -646,7 +547,7 @@ export const VoyagerScrollStory: React.FC<VoyagerScrollStoryProps> = ({
               {/* ============================================================= */}
               {idx === 5 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 600 230" className="w-full h-56 overflow-visible">
                     {/* Panel 1: 23-Watt Refrigerator Bulb Transmitter */}
                     <g transform="translate(100, 115)">
                       <rect x="-88" y="-98" width="176" height="196" rx="14" fill="#10193a" stroke="#fde047" strokeWidth="2" />

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Award,
   Box,
@@ -43,15 +43,22 @@ import {
   stopAuthenticNasaSnippet,
 } from './utils/soundEffects';
 
-type MainTab = 'home' | 'catalogue' | 'playground' | 'status' | 'badges';
+import {
+  UserProgressData,
+  computeStreakCount,
+  createEmptyProgress,
+  getTodayIsoDate,
+  loadGuestProgress,
+  logoutSession,
+  purgeLegacySharedStorage,
+  restoreActiveSession,
+  saveAuthenticatedProgress,
+  saveGuestProgress,
+  verifyMysteryOnServer,
+  verifyQuizPassOnServer,
+} from './utils/accountClient';
 
-const STORAGE_KEYS = {
-  USER: 'space_legacy_user_v3',
-  BADGES: 'space_legacy_badges_v3',
-  EXPLORED: 'space_legacy_explored_v3',
-  TRACK: 'space_legacy_track_v3',
-  MYSTERY: 'space_legacy_mystery_v3',
-};
+type MainTab = 'home' | 'catalogue' | 'playground' | 'status' | 'badges';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<MainTab>('home');
@@ -62,48 +69,23 @@ export default function App() {
   const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Persisted Explorer State
-  const [ageTrack, setAgeTrack] = useState<AgeTrack>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TRACK);
-    return (saved as AgeTrack) || 'junior';
+  // Strictly Isolated User vs Guest Explorer State
+  const [currentUser, setCurrentUser] = useState<ExplorerUserProfile | null>(null);
+  const currentUserRef = useRef<ExplorerUserProfile | null>(null);
+  const [progress, setProgress] = useState<UserProgressData>(() => {
+    purgeLegacySharedStorage();
+    return loadGuestProgress();
   });
 
-  const [unlockedBadges, setUnlockedBadges] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.BADGES);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [exploredMissionIds, setExploredMissionIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.EXPLORED);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Dynamic interaction counters for Curious Spark & Lexicon Master
-  const [dictionaryOpenCount, setDictionaryOpenCount] = useState<number>(0);
-  const [exploredJargonTerms, setExploredJargonTerms] = useState<string[]>([]);
-
-  const [currentUser, setCurrentUser] = useState<ExplorerUserProfile | null>(
-    () => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEYS.USER);
-        return saved ? JSON.parse(saved) : null;
-      } catch {
-        return null;
-      }
-    }
-  );
-
-  const [isMysterySolved, setIsMysterySolved] = useState<boolean>(() => {
-    return localStorage.getItem(STORAGE_KEYS.MYSTERY) === 'true';
-  });
+  // Destructured per-account / guest progress fields
+  const {
+    ageTrack,
+    unlockedBadges,
+    exploredMissionIds,
+    isMysterySolved,
+    dictionaryOpenCount,
+    exploredJargonTerms,
+  } = progress;
 
   // Modals & Interactive States
   const [activeMissionDossier, setActiveMissionDossier] =
@@ -124,53 +106,112 @@ export default function App() {
     NASA_AUTHENTIC_AUDIO_FEEDS[0].id
   );
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchFocusTimerRef = useRef<number | null>(null);
 
   const activeAudioTrack =
     NASA_AUTHENTIC_AUDIO_FEEDS.find((t) => t.id === selectedAudioTrackId) ||
     NASA_AUTHENTIC_AUDIO_FEEDS[0];
 
-  // Sync to localStorage
+  // Keep ref in sync with currentUser for async persistence
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TRACK, ageTrack);
-  }, [ageTrack]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.BADGES, JSON.stringify(unlockedBadges));
-  }, [unlockedBadges]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEYS.EXPLORED,
-      JSON.stringify(exploredMissionIds)
-    );
-  }, [exploredMissionIds]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.USER);
-    }
+    currentUserRef.current = currentUser;
   }, [currentUser]);
 
+  // Purge any insecure legacy shared keys & restore confidential active session on mount
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MYSTERY, String(isMysterySolved));
-  }, [isMysterySolved]);
+    let cancelled = false;
+    purgeLegacySharedStorage();
+    restoreActiveSession().then((restored) => {
+      if (cancelled) return;
+      if (restored) {
+        currentUserRef.current = restored.user;
+        setCurrentUser(restored.user);
+        setProgress(restored.progress);
+      } else {
+        currentUserRef.current = null;
+        setCurrentUser(null);
+        setProgress(loadGuestProgress());
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
+      if (searchFocusTimerRef.current !== null) {
+        window.clearTimeout(searchFocusTimerRef.current);
+      }
       stopAuthenticNasaSnippet();
     };
   }, []);
 
+  // Persist progress strictly to the active authenticated account OR isolated guest session
+  const updateProgress = (
+    updater: (prev: UserProgressData) => UserProgressData,
+    recordActivityDay: boolean = true
+  ) => {
+    setProgress((prev) => {
+      const updated = updater(prev);
+      const today = getTodayIsoDate();
+      const next: UserProgressData =
+        recordActivityDay && !updated.activeDates.includes(today)
+          ? { ...updated, activeDates: [...updated.activeDates, today] }
+          : updated;
+
+      if (currentUserRef.current) {
+        void saveAuthenticatedProgress(next);
+      } else {
+        saveGuestProgress(next);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAgeTrack = (nextTrack: AgeTrack) => {
+    setCurrentUser((prevUser) =>
+      prevUser ? { ...prevUser, ageTrack: nextTrack } : null
+    );
+    updateProgress((prev) => ({ ...prev, ageTrack: nextTrack }), false);
+  };
+
+  const handleLoginSuccess = (
+    user: ExplorerUserProfile,
+    loadedProgress: UserProgressData
+  ) => {
+    currentUserRef.current = user;
+    setCurrentUser(user);
+    setProgress(loadedProgress);
+    setActiveMissionDossier(null);
+    setCelebratingBadge(null);
+    setIsMysteryModalOpen(false);
+    setGlossarySelectedTerm(null);
+  };
+
+  const handleLogout = () => {
+    void logoutSession();
+    currentUserRef.current = null;
+    setCurrentUser(null);
+    setProgress(createEmptyProgress('junior'));
+    setActiveMissionDossier(null);
+    setCelebratingBadge(null);
+    setIsMysteryModalOpen(false);
+    setGlossarySelectedTerm(null);
+    setIsAuthModalOpen(false);
+  };
+
   const unlockAchievementBadge = (badgeId: string) => {
-    setUnlockedBadges((prev) => {
-      if (prev.includes(badgeId)) return prev;
+    updateProgress((prev) => {
+      if (prev.unlockedBadges.includes(badgeId)) return prev;
       const found = ACHIEVEMENT_BADGES.find((b) => b.id === badgeId) || null;
       if (found) {
         setCelebratingBadge(found);
       }
-      return [...prev, badgeId];
+      return {
+        ...prev,
+        unlockedBadges: [...prev.unlockedBadges, badgeId],
+      };
     });
   };
 
@@ -179,25 +220,33 @@ export default function App() {
     term: string,
     isTechnicalJargon: boolean
   ) => {
-    setDictionaryOpenCount((prev) => {
-      const nextCount = prev + 1;
-      if (nextCount >= 3) {
-        unlockAchievementBadge('curious-spark');
-      }
-      return nextCount;
-    });
+    updateProgress((prev) => {
+      const nextCount = prev.dictionaryOpenCount + 1;
+      const lower = term.toLowerCase();
+      const nextTerms =
+        isTechnicalJargon && !prev.exploredJargonTerms.includes(lower)
+          ? [...prev.exploredJargonTerms, lower]
+          : prev.exploredJargonTerms;
 
-    if (isTechnicalJargon) {
-      setExploredJargonTerms((prev) => {
-        const lower = term.toLowerCase();
-        if (prev.includes(lower)) return prev;
-        const updated = [...prev, lower];
-        if (updated.length >= 3) {
-          unlockAchievementBadge('lexicon-master');
-        }
-        return updated;
-      });
-    }
+      const nextBadges = [...prev.unlockedBadges];
+      if (nextCount >= 3 && !nextBadges.includes('curious-spark')) {
+        nextBadges.push('curious-spark');
+        const found = ACHIEVEMENT_BADGES.find((b) => b.id === 'curious-spark');
+        if (found) setCelebratingBadge(found);
+      }
+      if (nextTerms.length >= 3 && !nextBadges.includes('lexicon-master')) {
+        nextBadges.push('lexicon-master');
+        const found = ACHIEVEMENT_BADGES.find((b) => b.id === 'lexicon-master');
+        if (found) setCelebratingBadge(found);
+      }
+
+      return {
+        ...prev,
+        dictionaryOpenCount: nextCount,
+        exploredJargonTerms: nextTerms,
+        unlockedBadges: nextBadges,
+      };
+    });
   };
 
   // Track explored missions & check sector and hardware-engineer badges
@@ -208,8 +257,10 @@ export default function App() {
     setDossierInitialMode(mode);
     setActiveMissionDossier(mission);
 
-    setExploredMissionIds((prev) => {
-      const updated = prev.includes(mission.id) ? prev : [...prev, mission.id];
+    updateProgress((prev) => {
+      const updatedExplored = prev.exploredMissionIds.includes(mission.id)
+        ? prev.exploredMissionIds
+        : [...prev.exploredMissionIds, mission.id];
 
       const moonIds = MISSION_HARDWARE.filter(
         (m) => m.destination === 'moon'
@@ -221,31 +272,44 @@ export default function App() {
         (m) => m.destination === 'deep space'
       ).map((m) => m.id);
 
-      if (moonIds.every((id) => updated.includes(id))) {
-        unlockAchievementBadge('lunar-pioneer');
+      const nextBadges = [...prev.unlockedBadges];
+      const maybeUnlock = (badgeId: string) => {
+        if (!nextBadges.includes(badgeId)) {
+          nextBadges.push(badgeId);
+          const found = ACHIEVEMENT_BADGES.find((b) => b.id === badgeId);
+          if (found) setCelebratingBadge(found);
+        }
+      };
+
+      if (moonIds.every((id) => updatedExplored.includes(id))) {
+        maybeUnlock('lunar-pioneer');
       }
-      if (marsIds.every((id) => updated.includes(id))) {
-        unlockAchievementBadge('red-planet-rover');
+      if (marsIds.every((id) => updatedExplored.includes(id))) {
+        maybeUnlock('red-planet-rover');
       }
-      if (deepIds.every((id) => updated.includes(id))) {
-        unlockAchievementBadge('deep-space-voyager');
+      if (deepIds.every((id) => updatedExplored.includes(id))) {
+        maybeUnlock('deep-space-voyager');
       }
-      if (updated.length >= 5) {
-        unlockAchievementBadge('hardware-engineer');
+      if (updatedExplored.length >= 5) {
+        maybeUnlock('hardware-engineer');
       }
 
-      return updated;
+      return {
+        ...prev,
+        exploredMissionIds: updatedExplored,
+        unlockedBadges: nextBadges,
+      };
     });
   };
 
-  // Calculate Total XP & Streak
+  // Calculate Total XP & Streak strictly for active user or isolated guest
   const totalXp =
     ACHIEVEMENT_BADGES.reduce(
       (sum, b) => (unlockedBadges.includes(b.id) ? sum + b.xpValue : sum),
       0
     ) + (isMysterySolved ? 150 : 0);
 
-  const streakCount = Math.max(1, unlockedBadges.length);
+  const streakCount = computeStreakCount(progress);
 
   // Progress map for BadgesView
   const moonExploredCount = MISSION_HARDWARE.filter(
@@ -294,7 +358,11 @@ export default function App() {
 
   const handleFocusCatalogueSearch = () => {
     setActiveTab('catalogue');
-    setTimeout(() => {
+    if (searchFocusTimerRef.current !== null) {
+      window.clearTimeout(searchFocusTimerRef.current);
+    }
+    searchFocusTimerRef.current = window.setTimeout(() => {
+      searchFocusTimerRef.current = null;
       searchInputRef.current?.focus();
       searchInputRef.current?.scrollIntoView({
         behavior: 'smooth',
@@ -381,7 +449,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentUser(null)}
+                  onClick={handleLogout}
                   className="p-2 sm:p-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/35 text-rose-200 transition-colors cursor-pointer"
                   title="Log Out"
                   aria-label="Log Out"
@@ -450,16 +518,15 @@ export default function App() {
         {activeTab === 'playground' && <PlaygroundView />}
 
         {activeTab === 'status' && (
-          <StatusMapView
-            onOpenMissionDossier={handleOpenMissionDossier}
-            onJumpToCatalogueSector={handleJumpToCatalogueSector}
-          />
+          <StatusMapView onOpenMissionDossier={handleOpenMissionDossier} />
         )}
 
         {activeTab === 'badges' && (
           <BadgesView
             unlockedBadges={unlockedBadges}
             badgeProgressMap={badgeProgressMap}
+            totalXp={totalXp}
+            streakCount={streakCount}
             onCelebrateBadge={(badge) => setCelebratingBadge(badge)}
             onJumpToCatalogueSector={handleJumpToCatalogueSector}
           />
@@ -519,8 +586,17 @@ export default function App() {
       <MissionDossierModal
         mission={activeMissionDossier}
         initialMode={dossierInitialMode}
-        ageTrack={ageTrack}
-        onPerfectQuizScore={() => unlockAchievementBadge('cosmic-genius')}
+        onPerfectQuizScore={async (missionId, chapterAnswers, masterAnswer) => {
+          if (currentUserRef.current) {
+            const verified = await verifyQuizPassOnServer({
+              missionId,
+              chapterAnswers,
+              masterAnswer,
+            });
+            if (verified && !verified.isPerfect) return;
+          }
+          unlockAchievementBadge('cosmic-genius');
+        }}
         onOpenGlossaryTerm={(term) => setGlossarySelectedTerm(term)}
         onClose={() => setActiveMissionDossier(null)}
       />
@@ -540,9 +616,28 @@ export default function App() {
       <DailyMysteryModal
         isOpen={isMysteryModalOpen}
         onClose={() => setIsMysteryModalOpen(false)}
-        onSolved={() => {
-          setIsMysterySolved(true);
-          unlockAchievementBadge('signal-decoder');
+        onSolved={async (optionId) => {
+          if (currentUserRef.current) {
+            const verified = await verifyMysteryOnServer(optionId);
+            if (verified && !verified.isCorrect) return;
+          }
+          updateProgress((prev) => {
+            if (prev.isMysterySolved) return prev;
+            const nextBadges = prev.unlockedBadges.includes('signal-decoder')
+              ? prev.unlockedBadges
+              : [...prev.unlockedBadges, 'signal-decoder'];
+            if (!prev.unlockedBadges.includes('signal-decoder')) {
+              const found = ACHIEVEMENT_BADGES.find(
+                (b) => b.id === 'signal-decoder'
+              );
+              if (found) setCelebratingBadge(found);
+            }
+            return {
+              ...prev,
+              isMysterySolved: true,
+              unlockedBadges: nextBadges,
+            };
+          });
         }}
         isAlreadySolved={isMysterySolved}
         onOpenGlossaryTerm={(term) => setGlossarySelectedTerm(term)}
@@ -553,13 +648,13 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         currentUser={currentUser}
-        onLoginSuccess={(user) => setCurrentUser(user)}
-        onLogout={() => setCurrentUser(null)}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
         unlockedBadgesCount={unlockedBadges.length}
         totalXp={totalXp}
         streakCount={streakCount}
         ageTrack={ageTrack}
-        onSelectAgeTrack={setAgeTrack}
+        onSelectAgeTrack={handleSelectAgeTrack}
       />
     </div>
   );

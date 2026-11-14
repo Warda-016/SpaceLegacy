@@ -58,8 +58,8 @@ function getOrCreateNasaDomAudio(): HTMLAudioElement | null {
   }
   if (!persistentNasaDomAudio) {
     const el = document.createElement('audio');
-    el.id = 'space-legacy-nasa-feed-fallback';
-    el.preload = 'auto';
+    el.id = 'space-legacy-nasa-feed-player';
+    el.preload = 'none';
     el.volume = 1.0;
     el.muted = false;
     el.style.display = 'none';
@@ -107,8 +107,9 @@ export function playAuthenticNasaSnippet(
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
+        playPromise.catch((err) => {
           if (myToken !== activeNasaToken) return;
+          if (err instanceof DOMException && err.name === 'AbortError') return;
           speakTextLoudly({
             text: `${track.title}. ${track.description}`,
             onEnd: onEndedCallback,
@@ -116,8 +117,8 @@ export function playAuthenticNasaSnippet(
         });
       }
       return;
-    } catch {
-      // fall through
+    } catch (err) {
+      console.warn('Unable to start NASA audio element, falling back to TTS:', err);
     }
   }
 
@@ -142,8 +143,8 @@ export function stopAuthenticNasaSnippet() {
         el.onended = null;
         el.onerror = null;
         el.pause();
-      } catch {
-        // Ignore cleanup errors
+      } catch (err) {
+        console.warn('Error pausing NASA audio player:', err);
       }
     }
   }

@@ -9,16 +9,12 @@ import {
   X,
 } from 'lucide-react';
 import {
-  COSMIC_GLOSSARY_TERMS,
   GlossaryEntry,
   HIGHLIGHT_PHRASES,
   isKnownCosmicTerm,
   lookupAnyCosmicWord,
 } from '../data/cosmicDictionaryData';
 import { speakTextLoudly, stopLoudNarration } from '../utils/loudStoryAudio';
-
-export { COSMIC_GLOSSARY_TERMS, lookupAnyCosmicWord };
-export type { GlossaryEntry };
 
 interface CosmicGlossaryAssistantProps {
   userName?: string;
@@ -52,6 +48,16 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const aiGeneratedTermsRef = useRef(aiGeneratedTerms);
+  const onWordLookedUpRef = useRef(onWordLookedUp);
+
+  useEffect(() => {
+    aiGeneratedTermsRef.current = aiGeneratedTerms;
+  }, [aiGeneratedTerms]);
+
+  useEffect(() => {
+    onWordLookedUpRef.current = onWordLookedUp;
+  }, [onWordLookedUp]);
 
   // Persist dictionary cache to localStorage
   useEffect(() => {
@@ -60,8 +66,8 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
         AI_CACHE_STORAGE_KEY,
         JSON.stringify(aiGeneratedTerms)
       );
-    } catch {
-      // Ignore storage quota errors
+    } catch (err) {
+      console.warn('Unable to cache Cosmic Dictionary entries:', err);
     }
   }, [aiGeneratedTerms]);
 
@@ -71,7 +77,28 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
   };
 
   useEffect(() => {
+    stopSpeech();
+    setIsOpen(false);
+    setActiveEntry(null);
+    setSearchQuery('');
+  }, [userName]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        stopSpeech();
+        setIsOpen(false);
+        onClearExternalWord?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClearExternalWord]);
+
+  useEffect(() => {
     return () => {
+      abortControllerRef.current?.abort();
       stopLoudNarration();
     };
   }, []);
@@ -84,13 +111,15 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
 
     const cacheKey = cleaned.toLowerCase();
 
-    // Check cache first
-    if (aiGeneratedTerms[cacheKey]) {
-      const cached = aiGeneratedTerms[cacheKey];
+    // Check cache first via latest ref to avoid stale closures
+    const cachedMap = aiGeneratedTermsRef.current;
+    if (cachedMap[cacheKey]) {
+      const cached = cachedMap[cacheKey];
       setActiveEntry(cached);
-      if (onWordLookedUp) {
-        onWordLookedUp(cached.term, Boolean(cached.isTechnicalJargon));
-      }
+      onWordLookedUpRef.current?.(
+        cached.term,
+        Boolean(cached.isTechnicalJargon)
+      );
       return;
     }
 
@@ -99,12 +128,10 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
     setActiveEntry(instantEntry);
 
     if (!forceAi && isKnownCosmicTerm(cleaned)) {
-      if (onWordLookedUp) {
-        onWordLookedUp(
-          instantEntry.term,
-          Boolean(instantEntry.isTechnicalJargon)
-        );
-      }
+      onWordLookedUpRef.current?.(
+        instantEntry.term,
+        Boolean(instantEntry.isTechnicalJargon)
+      );
       return;
     }
 
@@ -130,25 +157,22 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
           [cacheKey]: aiEntry,
         }));
         setActiveEntry(aiEntry);
-        if (onWordLookedUp) {
-          onWordLookedUp(aiEntry.term, Boolean(aiEntry.isTechnicalJargon));
-        }
+        onWordLookedUpRef.current?.(
+          aiEntry.term,
+          Boolean(aiEntry.isTechnicalJargon)
+        );
       } else {
-        if (onWordLookedUp) {
-          onWordLookedUp(
-            instantEntry.term,
-            Boolean(instantEntry.isTechnicalJargon)
-          );
-        }
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      if (onWordLookedUp) {
-        onWordLookedUp(
+        onWordLookedUpRef.current?.(
           instantEntry.term,
           Boolean(instantEntry.isTechnicalJargon)
         );
       }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      onWordLookedUpRef.current?.(
+        instantEntry.term,
+        Boolean(instantEntry.isTechnicalJargon)
+      );
     } finally {
       if (abortControllerRef.current === controller) {
         setIsAiLoading(false);
@@ -164,10 +188,13 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
     void fetchAiDefinition(cleaned, forceAi);
   };
 
+  const triggerWordLookupRef = useRef(triggerWordLookup);
+  triggerWordLookupRef.current = triggerWordLookup;
+
   // Sync when user clicks a word via externalSelectedWord
   useEffect(() => {
     if (!externalSelectedWord) return;
-    triggerWordLookup(externalSelectedWord);
+    triggerWordLookupRef.current(externalSelectedWord);
   }, [externalSelectedWord]);
 
   // Listen for text selection or double-click on any word across the site
@@ -178,7 +205,7 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
       const selection = window.getSelection()?.toString().trim();
       if (!selection || selection.length < 2 || selection.length > 40) return;
       if (isKnownCosmicTerm(selection) || /\d/.test(selection)) {
-        triggerWordLookup(selection);
+        triggerWordLookupRef.current(selection);
       }
     };
 
@@ -187,7 +214,7 @@ export const CosmicGlossaryAssistant: React.FC<CosmicGlossaryAssistantProps> = (
       if (target && target.closest('[data-glossary-widget="true"]')) return;
       const selection = window.getSelection()?.toString().trim();
       if (selection && selection.length >= 2 && selection.length <= 40) {
-        triggerWordLookup(selection);
+        triggerWordLookupRef.current(selection);
       }
     };
 
@@ -471,33 +498,35 @@ export const GlossaryText: React.FC<{
         const isKnownWord = isKnownCosmicTerm(stripped);
         if (isKnownWord) {
           return (
-            <span
+            <button
               key={idx}
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectTerm(stripped);
               }}
-              className="cursor-pointer rounded px-[1px] underline decoration-white/25 decoration-dotted underline-offset-4 hover:bg-sky-400/15 hover:text-sky-200 hover:decoration-sky-400 transition-colors break-words"
+              className="inline text-left cursor-pointer rounded px-[1px] underline decoration-white/25 decoration-dotted underline-offset-4 hover:bg-sky-400/15 hover:text-sky-200 hover:decoration-sky-400 transition-colors break-words"
               title={`Click to define "${stripped}" in the Cosmic Dictionary`}
             >
               {token}
-            </span>
+            </button>
           );
         }
 
         if (stripped.length >= 3) {
           return (
-            <span
+            <button
               key={idx}
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectTerm(stripped);
               }}
-              className="cursor-pointer rounded px-[1px] hover:bg-sky-400/15 hover:text-sky-200 hover:underline hover:decoration-sky-400 hover:decoration-dotted underline-offset-4 transition-colors break-words"
+              className="inline text-left cursor-pointer rounded px-[1px] hover:bg-sky-400/15 hover:text-sky-200 hover:underline hover:decoration-sky-400 hover:decoration-dotted underline-offset-4 transition-colors break-words"
               title={`Click to look up "${stripped}" in the Cosmic Dictionary`}
             >
               {token}
-            </span>
+            </button>
           );
         }
 

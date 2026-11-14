@@ -2,13 +2,13 @@ export type DestinationFilter = 'all' | 'moon' | 'mars' | 'deep space';
 export type StatusFilter = 'all' | 'active' | 'complete' | 'traveling' | 'historic';
 export type AgeTrack = 'junior' | 'cadet' | 'scientist';
 
-export interface TelemetryMetric {
+interface TelemetryMetric {
   label: string;
   value: string;
   accent?: 'primary' | 'primary-fixed' | 'secondary' | 'tertiary' | 'on-surface' | 'outline';
 }
 
-export interface SubsystemSpec {
+interface SubsystemSpec {
   name: string;
   code: string;
   role: string;

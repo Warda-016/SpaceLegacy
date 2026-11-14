@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface OpportunityScrollStoryProps {
   onStartQuiz?: () => void;
@@ -124,114 +124,15 @@ const OPPORTUNITY_SCENES: StoryScene[] = [
 export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = OPPORTUNITY_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `opportunity-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < OPPORTUNITY_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(OPPORTUNITY_SCENES, 'opportunity');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -381,7 +282,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     {/* Real NASA Launch Photo */}
                     <div className="lg:col-span-4 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/opportunity-launch.jpg"
                         alt="NASA Opportunity Rover (MER-B) Delta II launch to Mars"
                         className="w-full h-full object-cover object-center"
@@ -398,7 +299,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
 
                     {/* 1 -> 2 -> 3 Visual Story Animation: Fold Like Origami -> Rocket Blastoff -> Earth to Mars */}
                     <div className="lg:col-span-8 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                      <svg
+                      <svg aria-hidden="true"
                         viewBox="0 0 600 235"
                         className="w-full h-60 overflow-visible"
                       >
@@ -575,7 +476,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     {/* Real NASA Photo of Opportunity's Empty Lander Inside Eagle Crater */}
                     <div className="lg:col-span-4 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/opportunity-eagle-lander.jpg"
                         alt="Real NASA photo of Opportunity's deflated airbag lander inside Eagle Crater on Mars"
                         className="w-full h-full object-cover object-center"
@@ -592,7 +493,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
 
                     {/* 1 -> 2 -> 3 Visual Story Animation: Inflate Airbags -> Bounce Into Crater -> Unfold Wings */}
                     <div className="lg:col-span-8 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                      <svg
+                      <svg aria-hidden="true"
                         viewBox="0 0 600 235"
                         className="w-full h-60 overflow-visible"
                       >
@@ -769,7 +670,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     {/* Real NASA Photo of Martian Blueberries */}
                     <div className="lg:col-span-4 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-black">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/opportunity-blueberries.jpg"
                         alt="Real NASA Opportunity Rover photo of round hematite spherules nicknamed Martian Blueberries"
                         className="w-full h-full object-cover object-center"
@@ -786,7 +687,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
 
                     {/* 1 -> 2 -> 3 Visual Story Animation: Ancient Groundwater -> Oppy Grinds & Inspects -> Water Confirmed! */}
                     <div className="lg:col-span-8 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-3 sm:p-4 flex items-center justify-center">
-                      <svg
+                      <svg aria-hidden="true"
                         viewBox="0 0 600 235"
                         className="w-full h-60 overflow-visible"
                       >
@@ -939,7 +840,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
                 {/* ============================================================= */}
                 {idx === 3 && (
                   <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 600 235"
                       className="w-full h-60 overflow-visible"
                     >
@@ -1110,7 +1011,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     {/* Real NASA Photo of Opportunity's Wheel Tracks & Crater */}
                     <div className="lg:col-span-4 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-emerald-400/50 bg-black">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/opportunity-marathon-tracks.jpg"
                         alt="Real NASA photo of Opportunity Rover wheel tracks stretching across Mars"
                         className="w-full h-full object-cover object-center"
@@ -1127,7 +1028,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
 
                     {/* Continuous Animated Mars Marathon Map: Eagle -> Endurance -> Victoria -> Endeavour (28 Miles!) */}
                     <div className="lg:col-span-8 rounded-2xl bg-[#070b1e] border border-emerald-400/35 p-3 sm:p-4 flex items-center justify-center">
-                      <svg
+                      <svg aria-hidden="true"
                         viewBox="0 0 600 235"
                         className="w-full h-60 overflow-visible"
                       >
@@ -1232,7 +1133,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     {/* Real NASA Image of the 2018 Global Dust Storm Blotting Out the Sun */}
                     <div className="lg:col-span-4 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-black">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/opportunity-dust-storm.jpg"
                         alt="Real NASA Opportunity image showing the Martian Sun dimming during the June 2018 global dust storm"
                         className="w-full h-full object-cover object-center"
@@ -1249,7 +1150,7 @@ export const OpportunityScrollStory: React.FC<OpportunityScrollStoryProps> = ({
 
                     {/* 1 -> 2 -> 3 Visual Story Animation: 90 Days vs 5,111 Days -> Giant Dust Storm Blocks Sun -> Goodnight Oppy */}
                     <div className="lg:col-span-8 rounded-2xl bg-[#070b1e] border border-amber-400/35 p-3 sm:p-4 flex items-center justify-center">
-                      <svg
+                      <svg aria-hidden="true"
                         viewBox="0 0 600 235"
                         className="w-full h-60 overflow-visible"
                       >

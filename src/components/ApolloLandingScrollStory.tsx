@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface ApolloLandingScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const APOLLO_SCENES: StoryScene[] = [
 export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = APOLLO_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `apollo-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < APOLLO_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(APOLLO_SCENES, 'apollo');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -366,7 +267,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   {/* Real Photo of Apollo 11 Eagle Lander & Astronaut */}
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/apollo-landing-hardware.jpg"
                       alt="Real NASA photo of Apollo 11 Lunar Module Eagle and Buzz Aldrin on the Moon"
                       className="w-full h-full object-cover object-center"
@@ -387,7 +288,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                       🎬 Live Animation: 240,000-Mile Flight From Earth to the Moon!
                     </span>
 
-                    <svg viewBox="0 0 520 215" className="w-full h-56 overflow-visible my-auto">
+                    <svg aria-hidden="true" viewBox="0 0 520 215" className="w-full h-56 overflow-visible my-auto">
                       {/* Stars */}
                       <circle cx="95" cy="30" r="1.8" fill="#ffffff" opacity="0.8" />
                       <circle cx="210" cy="20" r="2" fill="#fde047" opacity="0.9" />
@@ -516,7 +417,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                     🎬 Watch How Neil Armstrong &amp; Margaret Hamilton’s Code Saved the Apollo 11 Landing!
                   </span>
 
-                  <svg viewBox="0 0 680 265" className="w-full h-64 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 680 265" className="w-full h-64 overflow-visible">
                     {/* TOP LEFT HUD: MARGARET HAMILTON'S SMART COMPUTER */}
                     <g transform="translate(140, 46)">
                       <rect x="-125" y="-34" width="250" height="68" rx="12" fill="#0d1b2a" stroke="#34d399" strokeWidth="2.5" />
@@ -646,7 +547,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                     🎬 Live Animation: Hopping on the Moon, Scooping Rocks &amp; Bouncing Lasers to Earth!
                   </span>
 
-                  <svg viewBox="0 0 680 260" className="w-full h-64 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 680 260" className="w-full h-64 overflow-visible">
                     {/* Lunar Surface Ground */}
                     <path
                       d="M 10 198 Q 180 190 350 198 T 670 194 L 670 248 L 10 248 Z"
@@ -793,7 +694,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                     🎬 Live Animation: Unfolding Like a Lawn Chair &amp; Driving Across the Moon on Wire-Mesh Tires!
                   </span>
 
-                  <svg viewBox="0 0 680 255" className="w-full h-64 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 680 255" className="w-full h-64 overflow-visible">
                     {/* Rolling Lunar Hills Ground */}
                     <path
                       d="M 10 196 Q 170 184 330 196 T 670 188 L 670 245 L 10 245 Z"
@@ -914,7 +815,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                     🎬 Watch the Two Halves Separate: Silver Top Half Flies Home • Golden Bottom Half Stays on the Moon!
                   </span>
 
-                  <svg viewBox="0 0 680 270" className="w-full h-64 overflow-visible">
+                  <svg aria-hidden="true" viewBox="0 0 680 270" className="w-full h-64 overflow-visible">
                     {/* Lunar Surface Ground */}
                     <rect x="12" y="210" width="656" height="48" rx="10" fill="#475569" stroke="#94a3b8" strokeWidth="2" />
                     <text x="340" y="240" textAnchor="middle" fill="#fef08a" fontSize="13" fontWeight="bold">
@@ -1032,7 +933,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   {/* Left: Real NASA LRO Photo Showing Apollo Lander & Footpaths From Space */}
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-emerald-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/lro-apollo-sites.jpg"
                       alt="Real NASA Lunar Reconnaissance Orbiter photo showing Apollo lander and astronaut footpaths on the Moon"
                       className="w-full h-full object-cover object-center"
@@ -1053,7 +954,7 @@ export const ApolloLandingScrollStory: React.FC<ApolloLandingScrollStoryProps> =
                       🎬 Why Do Footprints Disappear on Earth But Last a Million Years on the Moon?
                     </span>
 
-                    <svg viewBox="0 0 540 220" className="w-full h-56 overflow-visible my-auto">
+                    <svg aria-hidden="true" viewBox="0 0 540 220" className="w-full h-56 overflow-visible my-auto">
                       {/* LEFT BOX: ON EARTH (WIND & RAIN ERASE FOOTPRINTS) */}
                       <g transform="translate(135, 110)">
                         <rect x="-125" y="-96" width="250" height="192" rx="14" fill="#10193a" stroke="#38bdf8" strokeWidth="2" />

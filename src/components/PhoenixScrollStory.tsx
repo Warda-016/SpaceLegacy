@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface PhoenixScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const PHOENIX_SCENES: StoryScene[] = [
 export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = PHOENIX_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `phoenix-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < PHOENIX_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(PHOENIX_SCENES, 'phoenix');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -368,7 +269,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/phoenix-launch.jpg"
                         alt="Real NASA photo of Delta II rocket launching Phoenix Mars Lander at night in Florida"
                         className="w-full h-full object-cover object-center"
@@ -384,7 +285,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
                     </div>
 
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/phoenix-lander.jpg"
                         alt="NASA Phoenix Mars Lander with round fan solar wings and 8-foot digging arm"
                         className="w-full h-full object-cover object-center"
@@ -405,7 +306,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
                     <span className="text-xs sm:text-sm font-bold text-sky-300 uppercase tracking-wider block text-center">
                       🎬 Live Animation: Heading to Mars’s Icy North Pole!
                     </span>
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 360 195"
                       className="w-full h-44 overflow-visible my-auto"
                     >
@@ -511,7 +412,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
               {/* SCENE 2: 12 PULSED THRUSTERS ("PFFT-PFFT!") & 15-MINUTE DUST WAIT */}
               {idx === 1 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 250"
                     className="w-full h-60 overflow-visible"
                   >
@@ -705,7 +606,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
               {idx === 2 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/phoenix-ice-trench.jpg"
                       alt="Real NASA photo taken by Phoenix showing dice-sized white ice crumbs in the Dodo-Goldilocks trench vanishing over 4 days"
                       className="w-full h-full object-cover object-center"
@@ -722,7 +623,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
 
                   {/* Kid-Friendly Animation: Day 1 vs Day 4 Ice Sublimation Detective */}
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 460 230"
                       className="w-full h-60 overflow-visible"
                     >
@@ -862,7 +763,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/phoenix-deep-trenches.jpg"
                       alt="Real NASA photo of trenches dug by Phoenix Mars Lander's robotic arm in Martian arctic soil"
                       className="w-full h-full object-cover object-center"
@@ -879,7 +780,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
 
                   {/* Kid-Friendly Animation: 1,800°F TEGA Oven + Veggie-Friendly Soil */}
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 460 225"
                       className="w-full h-56 overflow-visible"
                     >
@@ -1049,7 +950,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
               {idx === 4 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-emerald-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/phoenix-laser-snow.jpg"
                       alt="Real NASA photo of Phoenix Mars Lander firing its green LIDAR laser beam straight up into the Martian sky"
                       className="w-full h-full object-cover object-center"
@@ -1066,7 +967,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
 
                   {/* Kid-Friendly Animation: Green Laser Catching Falling Martian Snow */}
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 460 230"
                       className="w-full h-60 overflow-visible"
                     >
@@ -1196,7 +1097,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
               {idx === 5 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/phoenix-selfie-deck.jpg"
                       alt="Real NASA self-portrait of Phoenix Lander deck and round solar wings under sunny Martian summer skies"
                       className="w-full h-full object-cover object-center"
@@ -1212,7 +1113,7 @@ export const PhoenixScrollStory: React.FC<PhoenixScrollStoryProps> = ({
                   </div>
 
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/60 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/phoenix-winter-sleep.jpg"
                       alt="Real NASA orbital view of Phoenix resting in the Martian arctic plains after polar winter frost"
                       className="w-full h-full object-cover object-center"

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Award, Flame, Sparkles, Star, Trophy, Volume2, X } from 'lucide-react';
 import { AchievementBadge } from '../data/missions';
 import { playAuthenticNasaSnippet } from '../utils/soundEffects';
@@ -42,6 +42,17 @@ export const BadgeCelebrationModal: React.FC<BadgeCelebrationModalProps> = ({
       rotate: (i * 45) % 360,
     }));
   }, []);
+
+  useEffect(() => {
+    if (!badge) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [badge, onClose]);
 
   if (!badge) return null;
 

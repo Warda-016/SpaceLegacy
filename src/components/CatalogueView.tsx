@@ -326,9 +326,11 @@ export const CatalogueView: React.FC<CatalogueViewProps> = ({
               >
                 <div className="w-full">
                   {/* Image Header with Chronological Number & NASA PDS ID */}
-                  <div
+                  <button
+                    type="button"
                     onClick={() => onOpenMissionDossier(mission, 'story')}
-                    className="relative h-48 sm:h-52 w-full overflow-hidden bg-[#060814] cursor-pointer"
+                    className="relative h-48 sm:h-52 w-full overflow-hidden bg-[#060814] cursor-pointer block text-left"
+                    aria-label={`Open story for ${mission.title}`}
                   >
                     <img
                       src={mission.imageUrl}
@@ -373,7 +375,7 @@ export const CatalogueView: React.FC<CatalogueViewProps> = ({
                         {mission.nasaArchiveId}
                       </span>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Card Body */}
                   <div className="p-4 sm:p-5 space-y-3.5 sm:space-y-4">
@@ -401,12 +403,13 @@ export const CatalogueView: React.FC<CatalogueViewProps> = ({
                     {/* Responsive 3-Column Telemetry Strip */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10">
                       {mission.telemetry.map((metric) => (
-                        <div
+                        <button
                           key={metric.label}
+                          type="button"
                           onClick={() =>
                             onOpenGlossaryTerm && onOpenGlossaryTerm(metric.value)
                           }
-                          className="rounded-xl bg-[#080c21] border border-white/5 p-2.5 cursor-pointer hover:border-sky-400/40 transition-colors min-w-0"
+                          className="rounded-xl bg-[#080c21] border border-white/5 p-2.5 cursor-pointer hover:border-sky-400/40 transition-colors min-w-0 text-left w-full"
                           title="Click to define in Cosmic Dictionary"
                         >
                           <span className="block font-mono text-[10px] uppercase text-slate-400 tracking-wider truncate">
@@ -415,7 +418,7 @@ export const CatalogueView: React.FC<CatalogueViewProps> = ({
                           <span className="font-mono text-xs sm:text-sm font-bold text-sky-300 truncate block mt-0.5">
                             {metric.value}
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface InSightScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,116 +110,15 @@ const INSIGHT_SCENES: StoryScene[] = [
 export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  // Stop any speech when unmounting
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  // Track which scene card is currently in view when scrolling manually
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = INSIGHT_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `insight-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < INSIGHT_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(INSIGHT_SCENES, 'insight');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -370,7 +269,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/insight-launch.jpg"
                         alt="Real NASA photo of InSight Atlas V rocket on launchpad in California"
                         className="w-full h-full object-cover object-center"
@@ -386,7 +285,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
                     </div>
 
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/insight-cleanroom.jpg"
                         alt="Real NASA photo of InSight Lander unfolding its round solar fan wings"
                         className="w-full h-full object-cover object-center"
@@ -407,7 +306,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
                     <span className="text-xs sm:text-sm font-bold text-sky-300 uppercase tracking-wider block text-center">
                       🎬 Live Animation: Flying to Mars Together!
                     </span>
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 360 190"
                       className="w-full h-44 overflow-visible my-auto"
                     >
@@ -553,7 +452,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
               {/* SCENE 2: ROCKET LANDING ON FLAT MARS PLAIN */}
               {idx === 1 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 250"
                     className="w-full h-56 sm:h-64 overflow-visible"
                   >
@@ -772,7 +671,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
               {idx === 2 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-5 relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/insight-seis-mars.jpg"
                       alt="Real photo taken by InSight on Mars showing its copper SEIS stethoscope sitting on the red dirt"
                       className="w-full h-full object-cover object-center"
@@ -788,7 +687,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
                   </div>
 
                   <div className="lg:col-span-7 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 460 220"
                       className="w-full h-56 overflow-visible"
                     >
@@ -935,7 +834,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
               {/* SCENE 4: THE BURROWING MOLE & ROBOT SHOVEL RESCUE */}
               {idx === 3 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 235"
                     className="w-full h-56 overflow-visible"
                   >
@@ -1041,7 +940,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
               {/* SCENE 5: 1,319 MARSQUAKES & LIQUID METAL HEART */}
               {idx === 4 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 250"
                     className="w-full h-60 overflow-visible"
                   >
@@ -1184,7 +1083,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
               {idx === 5 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/insight-lander.jpg"
                       alt="Real NASA selfie of InSight in 2018 with clean solar panels"
                       className="w-full h-full object-cover object-center"
@@ -1200,7 +1099,7 @@ export const InSightScrollStory: React.FC<InSightScrollStoryProps> = ({
                   </div>
 
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/60 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/insight-final-selfie.jpg"
                       alt="Real NASA final selfie of InSight in 2022 covered in thick red Martian dust"
                       className="w-full h-full object-cover object-center"

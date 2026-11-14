@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface LroScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const LRO_SCENES: StoryScene[] = [
 export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = LRO_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `lro-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < LRO_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(LRO_SCENES, 'lro');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -368,7 +269,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/lro-launch.jpg"
                         alt="Real NASA photo of Lunar Reconnaissance Orbiter launching atop an Atlas V rocket in Florida"
                         className="w-full h-full object-cover object-center"
@@ -384,7 +285,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
                     </div>
 
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/lro-cleanroom.jpg"
                         alt="Real NASA photo of Lunar Reconnaissance Orbiter and Diviner instrument inside the NASA cleanroom"
                         className="w-full h-full object-cover object-center"
@@ -405,7 +306,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
                     <span className="text-xs sm:text-sm font-bold text-sky-300 uppercase tracking-wider block text-center">
                       🎬 Live Animation: North-to-South Polar Orbit!
                     </span>
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 360 195"
                       className="w-full h-44 overflow-visible my-auto"
                     >
@@ -526,7 +427,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
               {idx === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-6 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/lro-apollo-sites.jpg"
                       alt="Real NASA LROC orbital photograph of Apollo 11 Tranquility Base showing Eagle descent stage and astronaut footpaths"
                       className="w-full h-full object-cover object-center"
@@ -543,7 +444,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
 
                   {/* Animated LROC Telephoto Scan of Apollo Site */}
                   <div className="lg:col-span-6 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 440 230"
                       className="w-full h-60 overflow-visible"
                     >
@@ -703,7 +604,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
               {/* SCENE 3: PITCH-BLACK SOUTH POLE CRATERS COLDER THAN PLUTO (-248°C) */}
               {idx === 2 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 245"
                     className="w-full h-60 overflow-visible"
                   >
@@ -839,7 +740,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-6 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/lro-lola-map.jpg"
                       alt="Real NASA 3D lunar topography map created by LRO's LOLA 5-beam laser altimeter"
                       className="w-full h-full object-cover object-center"
@@ -856,7 +757,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
 
                   {/* Animated 5-Beam Green Laser Ruler */}
                   <div className="lg:col-span-6 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 430 225"
                       className="w-full h-56 overflow-visible"
                     >
@@ -967,7 +868,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
               {/* SCENE 5: 1.4+ PETABYTES RECORD & 220+ NEW IMPACT CRATERS */}
               {idx === 4 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 235"
                     className="w-full h-56 overflow-visible"
                   >
@@ -1144,7 +1045,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
               {idx === 5 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/lro-orbiter.jpg"
                       alt="NASA Lunar Reconnaissance Orbiter operating in low polar orbit above the Moon"
                       className="w-full h-full object-cover object-center"
@@ -1160,7 +1061,7 @@ export const LroScrollStory: React.FC<LroScrollStoryProps> = ({
                   </div>
 
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/60 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/lro-earthrise.jpg"
                       alt="Real high-resolution NASA LRO photograph of Earth rising above the lunar horizon"
                       className="w-full h-full object-cover object-center"

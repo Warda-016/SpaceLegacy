@@ -148,12 +148,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {DESTINATION_SECTORS.map((sector) => (
             <div
               key={sector.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onJumpToDestination(sector.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onJumpToDestination(sector.id);
+                }
+              }}
               className="group relative min-h-[16rem] sm:min-h-[18rem] w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 hover:border-sky-400 transition-all cursor-pointer shadow-xl flex flex-col justify-between p-4 sm:p-5"
             >
               <img
                 src={sector.imageUrl}
                 alt={sector.title}
+                loading="lazy"
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 pointer-events-none"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-[#060814]/70 to-[#060814]/30 pointer-events-none" />
@@ -216,13 +225,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
               className="rounded-2xl sm:rounded-3xl bg-[#0d132a] border border-white/10 hover:border-sky-400/50 p-4 flex flex-col justify-between gap-4 transition-all shadow-lg w-full max-w-full"
             >
               <div className="space-y-3">
-                <div
+                <button
+                  type="button"
                   onClick={() => onOpenMissionDossier(m, 'story')}
-                  className="relative h-36 rounded-2xl overflow-hidden bg-[#060814] cursor-pointer"
+                  className="relative h-36 w-full rounded-2xl overflow-hidden bg-[#060814] cursor-pointer block text-left"
+                  aria-label={`Open ${m.shortTitle} interactive story`}
                 >
                   <img
                     src={m.imageUrl}
                     alt={m.imageAlt}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                   <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#060814]/85 font-mono text-[10px] text-sky-300 border border-sky-400/30">
@@ -231,7 +243,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-[#060814]/85 font-mono text-[10px] text-amber-300 max-w-[85%] truncate">
                     {m.badge.emoji} {m.badge.name}
                   </span>
-                </div>
+                </button>
                 <div className="min-w-0">
                   <span className="font-mono text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 block truncate">
                     {m.sectorLabel}

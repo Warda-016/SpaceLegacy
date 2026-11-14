@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
-  CheckCircle2,
-  ChevronLeft,
   ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
-import { AgeTrack, MissionHardware } from '../data/missions';
+import { MissionHardware } from '../data/missions';
 import { getMissionStoryChapters } from '../data/storyChapters';
 import { stopLoudNarration } from '../utils/loudStoryAudio';
 import { AlsepScrollStory } from './AlsepScrollStory';
@@ -28,9 +26,11 @@ export type DossierTabMode = 'story' | 'quiz';
 interface MissionDossierModalProps {
   mission: MissionHardware | null;
   initialMode?: DossierTabMode;
-  ageTrack: AgeTrack;
-  onPerfectQuizScore: (missionId: string) => void;
-  onAllPartsInspected?: (missionId: string) => void;
+  onPerfectQuizScore: (
+    missionId: string,
+    chapterAnswers: Record<number, number>,
+    masterAnswer: number | null
+  ) => void;
   onOpenGlossaryTerm?: (term: string) => void;
   onClose: () => void;
 }
@@ -66,6 +66,17 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
       stopLoudNarration();
     };
   }, []);
+
+  useEffect(() => {
+    if (!mission) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mission, onClose]);
 
   if (!mission) return null;
 
@@ -103,7 +114,7 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
     const finalRight = nextMasterAnswer === mission.quizQuestion.correctIndex;
     if (allChaptersRight && finalRight) {
       setHasAwardedPerfect(true);
-      onPerfectQuizScore(mission.id);
+      onPerfectQuizScore(mission.id, nextChapterAnswers, nextMasterAnswer);
     }
   };
 
@@ -278,12 +289,13 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
             {/* Telemetry Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
               {mission.telemetry.map((metric) => (
-                <div
+                <button
                   key={metric.label}
+                  type="button"
                   onClick={() =>
                     onOpenGlossaryTerm && onOpenGlossaryTerm(metric.value)
                   }
-                  className="rounded-2xl bg-[#111733] border border-white/10 hover:border-sky-400/50 p-4 cursor-pointer transition-colors min-w-0"
+                  className="rounded-2xl bg-[#111733] border border-white/10 hover:border-sky-400/50 p-4 cursor-pointer transition-colors min-w-0 text-left w-full"
                   title="Click to define in Cosmic Dictionary"
                 >
                   <span className="block font-mono text-[10px] sm:text-xs uppercase tracking-widest text-slate-400 mb-1">
@@ -292,7 +304,7 @@ export const MissionDossierModal: React.FC<MissionDossierModalProps> = ({
                   <span className="font-headline text-lg sm:text-xl font-bold text-sky-300 break-words block">
                     {metric.value}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
 

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  AlertCircle,
   Award,
   CheckCircle2,
   Flame,
+  Lock,
   LogIn,
   LogOut,
   Rocket,
@@ -13,6 +15,11 @@ import {
   X,
 } from 'lucide-react';
 import { ACHIEVEMENT_BADGES, AgeTrack } from '../data/missions';
+import {
+  loginAccount,
+  signUpAccount,
+  UserProgressData,
+} from '../utils/accountClient';
 
 export interface ExplorerUserProfile {
   id: string;
@@ -27,7 +34,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: ExplorerUserProfile | null;
-  onLoginSuccess: (user: ExplorerUserProfile) => void;
+  onLoginSuccess: (
+    user: ExplorerUserProfile,
+    progress: UserProgressData
+  ) => void;
   onLogout: () => void;
   unlockedBadgesCount: number;
   totalXp: number;
@@ -50,45 +60,108 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   ageTrack,
   onSelectAgeTrack,
 }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>(currentUser ? 'login' : 'signup');
-  const [callsign, setCallsign] = useState(currentUser?.callsign || '');
-  const [email, setEmail] = useState(currentUser?.email || '');
+  const [mode, setMode] = useState<'login' | 'signup'>(
+    currentUser ? 'login' : 'signup'
+  );
+  const [callsign, setCallsign] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState(currentUser?.avatarEmoji || '👩‍🚀');
+  const [selectedAvatar, setSelectedAvatar] = useState('👩‍🚀');
   const [selectedTrack, setSelectedTrack] = useState<AgeTrack>(ageTrack);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  // Reset sensitive form inputs whenever modal opens/closes or active user logs out
+  useEffect(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (!currentUser) {
+      setCallsign('');
+      setEmail('');
+      setPassword('');
+      setSelectedAvatar('👩‍🚀');
+    }
+    setSelectedTrack(ageTrack);
+    setErrorMsg(null);
+    setFeedbackMsg(null);
+    setIsSubmitting(false);
+  }, [isOpen, currentUser, ageTrack]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanCallsign =
-      callsign.trim() || (email.includes('@') ? email.split('@')[0] : 'AstroCadet');
-    const cleanEmail = email.trim() || `${cleanCallsign.toLowerCase()}@nasa-kids.org`;
+    if (isSubmitting) return;
+    setErrorMsg(null);
+    setFeedbackMsg(null);
+    setIsSubmitting(true);
 
-    const newUser: ExplorerUserProfile = {
-      id: `usr_${Date.now()}`,
-      callsign: cleanCallsign,
-      email: cleanEmail,
-      avatarEmoji: selectedAvatar,
-      ageTrack: selectedTrack,
-      joinedDate: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        year: 'numeric',
-      }),
-    };
+    try {
+      if (mode === 'signup') {
+        const result = await signUpAccount({
+          callsign,
+          email,
+          password,
+          avatarEmoji: selectedAvatar,
+          ageTrack: selectedTrack,
+        });
+        onLoginSuccess(result.user, result.progress);
+        setPassword('');
+        setFeedbackMsg(
+          `Welcome aboard, Commander ${result.user.callsign}! Your private Space Legacy vault is active.`
+        );
+      } else {
+        const result = await loginAccount({
+          email,
+          password,
+        });
+        onLoginSuccess(result.user, result.progress);
+        setPassword('');
+        setFeedbackMsg(
+          `Welcome back, Commander ${result.user.callsign}! Your private telemetry & badges are synced.`
+        );
+      }
 
-    onSelectAgeTrack(selectedTrack);
-    onLoginSuccess(newUser);
-    setFeedbackMsg(
-      mode === 'signup'
-        ? `Welcome aboard, Commander ${newUser.callsign}! Your Space Legacy passport is active.`
-        : `Welcome back, Commander ${newUser.callsign}! Telemetry & badges synced.`
-    );
-    setTimeout(() => {
-      setFeedbackMsg(null);
-      onClose();
-    }, 900);
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+      closeTimerRef.current = window.setTimeout(() => {
+        closeTimerRef.current = null;
+        setFeedbackMsg(null);
+        onClose();
+      }, 900);
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : 'Unable to authenticate your explorer account.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -236,10 +309,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         ) : (
           /* Sign Up / Log In Form with Designated Age Category Selection */
           <div>
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#080c21] border border-white/10 mb-5">
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#080c21] border border-white/10 mb-4">
               <button
                 type="button"
-                onClick={() => setMode('signup')}
+                onClick={() => {
+                  setMode('signup');
+                  setErrorMsg(null);
+                  setFeedbackMsg(null);
+                }}
                 className={`py-2.5 rounded-xl font-headline font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   mode === 'signup'
                     ? 'bg-sky-400 text-[#060814] shadow-md'
@@ -251,7 +328,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setMode('login')}
+                onClick={() => {
+                  setMode('login');
+                  setErrorMsg(null);
+                  setFeedbackMsg(null);
+                }}
                 className={`py-2.5 rounded-xl font-headline font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   mode === 'login'
                     ? 'bg-sky-400 text-[#060814] shadow-md'
@@ -263,43 +344,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Avatar Picker */}
-              <div>
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-2">
-                  Choose Your Explorer Patch Avatar
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {AVATAR_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setSelectedAvatar(emoji)}
-                      className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center border transition-all cursor-pointer ${
-                        selectedAvatar === emoji
-                          ? 'bg-sky-400/25 border-sky-400 scale-110 shadow-[0_0_15px_rgba(56,189,248,0.4)]'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="mb-4 px-3 py-2 rounded-xl bg-sky-400/10 border border-sky-400/20 text-[11px] text-sky-200 flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5 shrink-0 text-sky-300" />
+              <span>
+                Private encrypted vault: your streaks, XP, badges &amp; progress belong strictly to your account.
+              </span>
+            </div>
 
-              <div>
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-1.5">
-                  Explorer Callsign / Username
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={callsign}
-                  onChange={(e) => setCallsign(e.target.value)}
-                  placeholder="e.g. StarVoyagerMaya or CaptainLeo"
-                  className="w-full px-4 py-3 rounded-xl bg-[#080c21] border border-white/15 text-white text-sm focus:outline-none focus:border-sky-400"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'signup' && (
+                <>
+                  {/* Avatar Picker */}
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-2">
+                      Choose Your Explorer Patch Avatar
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {AVATAR_OPTIONS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setSelectedAvatar(emoji)}
+                          className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center border transition-all cursor-pointer ${
+                            selectedAvatar === emoji
+                              ? 'bg-sky-400/25 border-sky-400 scale-110 shadow-[0_0_15px_rgba(56,189,248,0.4)]'
+                              : 'bg-white/5 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-1.5">
+                      Explorer Callsign / Username
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      minLength={2}
+                      value={callsign}
+                      onChange={(e) => setCallsign(e.target.value)}
+                      placeholder="e.g. StarVoyagerMaya or CaptainLeo"
+                      className="w-full px-4 py-3 rounded-xl bg-[#080c21] border border-white/15 text-white text-sm focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-1.5">
@@ -308,6 +401,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="explorer@spacelegacy.org"
@@ -317,11 +411,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-1.5">
-                  Mission Passcode
+                  Mission Passcode {mode === 'signup' ? '(Min 6 Characters)' : ''}
                 </label>
                 <input
                   type="password"
                   required
+                  minLength={mode === 'signup' ? 6 : 1}
+                  autoComplete={
+                    mode === 'signup' ? 'new-password' : 'current-password'
+                  }
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -329,37 +427,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Designated Explorer Age Category Selection */}
-              <div>
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-1.5">
-                  Select Your Explorer Age Category
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      { id: 'junior', label: 'Ages 10–12' },
-                      { id: 'cadet', label: 'Ages 13–15' },
-                      { id: 'scientist', label: 'Ages 16–18' },
-                    ] as const
-                  ).map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTrack(t.id);
-                        onSelectAgeTrack(t.id);
-                      }}
-                      className={`py-2 px-2 rounded-xl font-mono text-xs border transition-all cursor-pointer ${
-                        selectedTrack === t.id
-                          ? 'bg-sky-400/20 text-sky-300 border-sky-400 font-bold'
-                          : 'bg-white/5 text-slate-300 border-white/10'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+              {mode === 'signup' && (
+                /* Designated Explorer Age Category Selection */
+                <div>
+                  <label className="block font-mono text-[10px] uppercase tracking-widest text-slate-300 mb-1.5">
+                    Select Your Explorer Age Category
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        { id: 'junior', label: 'Ages 10–12' },
+                        { id: 'cadet', label: 'Ages 13–15' },
+                        { id: 'scientist', label: 'Ages 16–18' },
+                      ] as const
+                    ).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTrack(t.id);
+                          onSelectAgeTrack(t.id);
+                        }}
+                        className={`py-2 px-2 rounded-xl font-mono text-xs border transition-all cursor-pointer ${
+                          selectedTrack === t.id
+                            ? 'bg-sky-400/20 text-sky-300 border-sky-400 font-bold'
+                            : 'bg-white/5 text-slate-300 border-white/10'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
 
               {feedbackMsg && (
                 <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs flex items-center gap-2">
@@ -370,12 +477,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-sky-400 to-cyan-300 text-[#060814] font-headline font-bold text-xs uppercase tracking-widest shadow-[0_10px_25px_rgba(56,189,248,0.35)] hover:brightness-110 transition-all cursor-pointer flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-sky-400 to-cyan-300 text-[#060814] font-headline font-bold text-xs uppercase tracking-widest shadow-[0_10px_25px_rgba(56,189,248,0.35)] hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <Rocket className="w-4 h-4" />
-                {mode === 'signup'
-                  ? 'Create Space Legacy Account'
-                  : 'Log In & Sync Mission Badges'}
+                {isSubmitting
+                  ? 'Securing Explorer Vault...'
+                  : mode === 'signup'
+                    ? 'Create Space Legacy Account'
+                    : 'Log In & Sync Private Progress'}
               </button>
             </form>
           </div>

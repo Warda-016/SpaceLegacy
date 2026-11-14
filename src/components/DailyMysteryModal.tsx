@@ -6,7 +6,7 @@ import { GlossaryText } from './CosmicGlossaryAssistant';
 interface DailyMysteryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSolved: () => void;
+  onSolved: (optionId: string) => void;
   isAlreadySolved: boolean;
   onOpenGlossaryTerm?: (term: string) => void;
 }
@@ -27,10 +27,23 @@ export const DailyMysteryModal: React.FC<DailyMysteryModalProps> = ({
   );
 
   useEffect(() => {
-    if (isAlreadySolved && selectedIndex === null) {
+    if (isAlreadySolved) {
       setSelectedIndex(correctOptionIndex);
+    } else {
+      setSelectedIndex(null);
     }
-  }, [isAlreadySolved, correctOptionIndex, selectedIndex]);
+  }, [isAlreadySolved, correctOptionIndex]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -42,7 +55,7 @@ export const DailyMysteryModal: React.FC<DailyMysteryModalProps> = ({
     setSelectedIndex(idx);
     const chosen = DAILY_MYSTERY.options[idx];
     if (chosen?.isCorrect && !isAlreadySolved) {
-      onSolved();
+      onSolved(chosen.id);
     }
   };
 

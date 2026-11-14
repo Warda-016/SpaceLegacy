@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   Award,
   CheckCircle2,
@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { playLoudNarration, stopLoudNarration } from '../utils/loudStoryAudio';
+import { useScrollStoryPlayback } from '../utils/useScrollStoryPlayback';
 
 interface CuriosityScrollStoryProps {
   onStartQuiz?: () => void;
@@ -110,114 +110,15 @@ const CURIOSITY_SCENES: StoryScene[] = [
 export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
   onStartQuiz,
 }) => {
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [speakingStep, setSpeakingStep] = useState<number | null>(null);
-  const autoPlayRef = useRef(false);
-
-  useEffect(() => {
-    autoPlayRef.current = isAutoPlaying;
-  }, [isAutoPlaying]);
-
-  useEffect(() => {
-    return () => {
-      stopLoudNarration();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-
-    cardRefs.current.forEach((card, idx) => {
-      if (!card) return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting && !autoPlayRef.current) {
-              setActiveStep(idx);
-            }
-          });
-        },
-        { threshold: 0.45 }
-      );
-      obs.observe(card);
-      observers.push(obs);
-    });
-
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, []);
-
-  const speakStep = (stepIdx: number, continueAutoTour: boolean) => {
-    const scene = CURIOSITY_SCENES[stepIdx];
-    if (!scene) return;
-
-    setActiveStep(stepIdx);
-    cardRefs.current[stepIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-
-    playLoudNarration({
-      clipKey: `curiosity-${stepIdx + 1}`,
-      fallbackText: scene.spokenNarration,
-      onStart: () => {
-        setSpeakingStep(stepIdx);
-      },
-      onEnd: () => {
-        setSpeakingStep(null);
-        if (continueAutoTour && autoPlayRef.current) {
-          if (stepIdx + 1 < CURIOSITY_SCENES.length) {
-            speakStep(stepIdx + 1, true);
-          } else {
-            setIsAutoPlaying(false);
-          }
-        }
-      },
-      onError: () => {
-        setSpeakingStep(null);
-        setIsAutoPlaying(false);
-      },
-    });
-  };
-
-  const toggleAutoPlayStory = () => {
-    if (isAutoPlaying) {
-      setIsAutoPlaying(false);
-      autoPlayRef.current = false;
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      setIsAutoPlaying(true);
-      autoPlayRef.current = true;
-      speakStep(activeStep, true);
-    }
-  };
-
-  const toggleSingleCardVoice = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    if (speakingStep === idx) {
-      setSpeakingStep(null);
-      stopLoudNarration();
-    } else {
-      speakStep(idx, false);
-    }
-  };
-
-  const jumpToStep = (idx: number) => {
-    setIsAutoPlaying(false);
-    autoPlayRef.current = false;
-    setSpeakingStep(null);
-    stopLoudNarration();
-    setActiveStep(idx);
-    cardRefs.current[idx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-  };
+  const {
+    cardRefs,
+    activeStep,
+    isAutoPlaying,
+    speakingStep,
+    toggleAutoPlayStory,
+    toggleSingleCardVoice,
+    jumpToStep,
+  } = useScrollStoryPlayback(CURIOSITY_SCENES, 'curiosity');
 
   return (
     <div className="w-full space-y-6 antialiased">
@@ -368,7 +269,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/curiosity-launch.jpg"
                         alt="Real NASA photo of Mars Science Laboratory Curiosity atop its Atlas V rocket in Florida"
                         className="w-full h-full object-cover object-center"
@@ -384,7 +285,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
                     </div>
 
                     <div className="relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                      <img
+                      <img loading="lazy"
                         src="/images/missions/curiosity-cleanroom.jpg"
                         alt="Real NASA photo of SUV-sized Curiosity Rover during testing in the NASA cleanroom"
                         className="w-full h-full object-cover object-center"
@@ -405,7 +306,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
                     <span className="text-xs sm:text-sm font-bold text-sky-300 uppercase tracking-wider block text-center">
                       🎬 Live Animation: Nuclear Tail Power!
                     </span>
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 360 190"
                       className="w-full h-44 overflow-visible my-auto"
                     >
@@ -481,7 +382,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
               {/* SCENE 2: FIRST-EVER SKY CRANE JETPACK LANDING */}
               {idx === 1 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 250"
                     className="w-full h-60 overflow-visible"
                   >
@@ -686,7 +587,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
               {/* SCENE 3: CHEMCAM 1,000,000+ LASER ZAPS */}
               {idx === 2 && (
                 <div className="rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 sm:p-6">
-                  <svg
+                  <svg aria-hidden="true"
                     viewBox="0 0 680 240"
                     className="w-full h-56 overflow-visible"
                   >
@@ -853,7 +754,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
               {idx === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-6 relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/curiosity-drill-holes.jpg"
                       alt="Real NASA collage showing 42 rock holes drilled by Curiosity Rover across Gale Crater on Mars"
                       className="w-full h-full object-cover object-center"
@@ -870,7 +771,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
 
                   {/* Animated SAM Belly Chemistry Oven */}
                   <div className="lg:col-span-6 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 420 220"
                       className="w-full h-56 overflow-visible"
                     >
@@ -957,7 +858,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
               {idx === 4 && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                   <div className="lg:col-span-6 relative h-60 sm:h-64 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/curiosity-tracks.jpg"
                       alt="Real NASA photo of Curiosity Rover wheel tracks stamped into Martian sand dunes"
                       className="w-full h-full object-cover object-center"
@@ -974,7 +875,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
 
                   {/* Animated Morse Code Stamp Track Diagram */}
                   <div className="lg:col-span-6 rounded-2xl bg-[#070b1e] border border-sky-400/35 p-4 flex items-center justify-center">
-                    <svg
+                    <svg aria-hidden="true"
                       viewBox="0 0 420 210"
                       className="w-full h-52 overflow-visible"
                     >
@@ -1120,7 +1021,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
               {idx === 5 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-sky-400/50 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/curiosity-rover.jpg"
                       alt="Real NASA self-portrait of Curiosity Rover on Mount Sharp in Gale Crater"
                       className="w-full h-full object-cover object-center"
@@ -1136,7 +1037,7 @@ export const CuriosityScrollStory: React.FC<CuriosityScrollStoryProps> = ({
                   </div>
 
                   <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border-2 border-amber-400/60 bg-[#060814]">
-                    <img
+                    <img loading="lazy"
                       src="/images/missions/curiosity-sulfur.jpg"
                       alt="Real NASA photo of pure yellow sulfur stones discovered when Curiosity's wheel crushed a rock in Gediz Vallis channel"
                       className="w-full h-full object-cover object-center"

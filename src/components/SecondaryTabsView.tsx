@@ -40,12 +40,10 @@ export const PlaygroundView: React.FC = () => {
 
 interface StatusMapViewProps {
   onOpenMissionDossier: (mission: MissionHardware, mode?: DossierTabMode) => void;
-  onJumpToCatalogueSector: (dest: DestinationFilter) => void;
 }
 
 export const StatusMapView: React.FC<StatusMapViewProps> = ({
   onOpenMissionDossier,
-  onJumpToCatalogueSector,
 }) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string>('voyager-1');
   const selectedMission =
@@ -171,6 +169,8 @@ export const StatusMapView: React.FC<StatusMapViewProps> = ({
 interface BadgesViewProps {
   unlockedBadges: string[];
   badgeProgressMap: Record<string, number>;
+  totalXp: number;
+  streakCount: number;
   onCelebrateBadge: (badge: AchievementBadge) => void;
   onJumpToCatalogueSector: (dest: DestinationFilter) => void;
 }
@@ -178,14 +178,11 @@ interface BadgesViewProps {
 export const BadgesView: React.FC<BadgesViewProps> = ({
   unlockedBadges,
   badgeProgressMap,
+  totalXp,
+  streakCount,
   onCelebrateBadge,
   onJumpToCatalogueSector,
 }) => {
-  const totalXp = ACHIEVEMENT_BADGES.reduce(
-    (acc, b) => (unlockedBadges.includes(b.id) ? acc + b.xpValue : acc),
-    0
-  );
-
   return (
     <div className="w-full max-w-full space-y-6 pb-16">
       {/* Top Gamified Achievement Header */}
@@ -225,7 +222,7 @@ export const BadgesView: React.FC<BadgesViewProps> = ({
           <div className="rounded-2xl bg-[#080c21] border border-orange-400/30 p-3 sm:p-4 text-center">
             <Flame className="w-5 h-5 text-orange-400 mx-auto mb-1" />
             <span className="block font-headline text-lg sm:text-2xl font-bold text-orange-300">
-              {Math.max(1, unlockedBadges.length)}
+              {streakCount}
             </span>
             <span className="font-mono text-[10px] uppercase text-slate-400">
               Day Streak

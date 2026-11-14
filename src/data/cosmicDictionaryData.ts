@@ -20,7 +20,7 @@ export interface GlossaryEntry {
  * Primary featured technical terms shown as quick-access chips in the Cosmic Dictionary
  * and highlighted with dotted sky-blue underlines across all mission stories & cards.
  */
-export const COSMIC_GLOSSARY_TERMS: GlossaryEntry[] = [
+const COSMIC_GLOSSARY_TERMS: GlossaryEntry[] = [
   {
     term: 'AU (Astronomical Unit)',
     aliases: [
@@ -457,7 +457,7 @@ interface CompactEntry {
  * Comprehensive site-wide dictionary mapping all mission names, instruments,
  * telemetry badges, planetary features, and space terms across Space Legacy.
  */
-export const EXTENDED_SITE_DICTIONARY: Record<string, CompactEntry> = {
+const EXTENDED_SITE_DICTIONARY: Record<string, CompactEntry> = {
   // Missions & Hardware Pioneers
   apollo: {
     term: 'Apollo Program',
